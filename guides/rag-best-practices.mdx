@@ -506,31 +506,6 @@ def validate_answer_quality(answer: str, sources: list, question: str) -> dict:
 
 ## Performance Optimization
 
-### Caching Strategy
-
-```python
-import hashlib
-from functools import lru_cache
-
-# Cache search results
-@lru_cache(maxsize=1000)
-def cached_search(query_hash: str, dataset_id: str) -> dict:
-    return client.query(
-        dataset_id=dataset_id,
-        query=query_hash,
-        limit=10
-    )
-
-def search_with_cache(query: str, dataset_id: str) -> dict:
-    # Hash query for cache key
-    query_hash = hashlib.md5(query.lower().encode()).hexdigest()
-    return cached_search(query_hash, dataset_id)
-```
-
-<Card title="Caching Guide" icon="bolt" href="/guides/caching">
-  Learn more about caching strategies →
-</Card>
-
 ### Batch Processing
 
 ```python
@@ -685,7 +660,6 @@ answer = generate_answer(question, results['chunks'])
 
 ## Production Checklist
 
-- [ ] Implement caching for frequent queries
 - [ ] Add fallback strategies for no/low-quality results
 - [ ] Log all queries and responses for analysis
 - [ ] Monitor search relevance scores
@@ -703,16 +677,16 @@ answer = generate_answer(question, results['chunks'])
     Build your first RAG app
   </Card>
 
-  <Card title="Caching Guide" icon="bolt" href="/guides/caching">
-    Optimize with caching
-  </Card>
-
   <Card title="MCP API" icon="magnifying-glass" href="/api-reference/mcp/query">
     MCP query endpoint reference
   </Card>
 
   <Card title="Troubleshooting" icon="wrench" href="/support/troubleshooting">
     Common issues and solutions
+  </Card>
+
+  <Card title="Authentication" icon="key" href="/authentication/overview">
+    Secure your integration
   </Card>
 </CardGroup>
 

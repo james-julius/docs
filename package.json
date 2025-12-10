@@ -1,0 +1,21 @@
+{
+  "name": "fltr-docs",
+  "version": "1.0.0",
+  "description": "FLTR Documentation",
+  "scripts": {
+    "dev": "mint dev",
+    "start": "mint dev",
+    "install:cli": "npm install -g mint",
+    "update": "mint update",
+    "build": "echo 'Docs are built automatically by Mintlify on push'",
+    "lint": "echo 'No linting configured'"
+  },
+  "keywords": [
+    "fltr",
+    "documentation",
+    "mintlify"
+  ],
+  "author": "FLTR",
+  "license": "UNLICENSED",
+  "private": true
+}

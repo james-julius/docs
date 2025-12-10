@@ -531,20 +531,6 @@ def search_with_retry(dataset_id: str, query: str):
         raise
 ```
 
-### Caching
-
-Cache frequent queries to reduce API calls:
-
-```python
-from functools import lru_cache
-import hashlib
-
-@lru_cache(maxsize=100)
-def cached_search(dataset_id: str, query: str):
-    # Cache key includes dataset and query
-    return search_knowledge_base(dataset_id, query)
-```
-
 ### Monitoring
 
 Track performance and costs:
