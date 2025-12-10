@@ -1,0 +1,369 @@
+---
+title: 'OAuth Scopes'
+description: 'Permissions and access control for OAuth applications'
+---
+
+# OAuth Scopes
+
+OAuth scopes define what permissions your application has when accessing FLTR on behalf of a user.
+
+## Available Scopes
+
+### Datasets
+
+<ParamField scope="datasets:read" type="read">
+  Read datasets and their metadata
+
+  **Grants access to:**
+  - `GET /v1/datasets`
+  - `GET /v1/datasets/{id}`
+  - View dataset information
+</ParamField>
+
+<ParamField scope="datasets:write" type="write">
+  Create and modify datasets
+
+  **Grants access to:**
+  - `POST /v1/datasets`
+  - `PATCH /v1/datasets/{id}`
+  - Create and update datasets
+  - Modify dataset metadata
+
+  **Requires:** `datasets:read`
+</ParamField>
+
+<ParamField scope="datasets:delete" type="delete">
+  Delete datasets permanently
+
+  **Grants access to:**
+  - `DELETE /v1/datasets/{id}`
+  - Permanent dataset deletion
+
+  **Requires:** `datasets:read`, `datasets:write`
+</ParamField>
+
+### Documents
+
+<ParamField scope="documents:read" type="read">
+  Read documents and their content
+
+  **Grants access to:**
+  - `GET /v1/datasets/{id}/documents`
+  - `GET /v1/datasets/{id}/documents/{doc_id}`
+  - View document content and metadata
+</ParamField>
+
+<ParamField scope="documents:write" type="write">
+  Upload and modify documents
+
+  **Grants access to:**
+  - `POST /v1/datasets/{id}/documents`
+  - Upload new documents
+  - Update document metadata
+
+  **Requires:** `documents:read`
+</ParamField>
+
+<ParamField scope="documents:delete" type="delete">
+  Delete documents permanently
+
+  **Grants access to:**
+  - `DELETE /v1/datasets/{id}/documents/{doc_id}`
+  - Permanent document deletion
+
+  **Requires:** `documents:read`
+</ParamField>
+
+### MCP (Model Context Protocol)
+
+<ParamField scope="mcp:query" type="read">
+  Query datasets using semantic search
+
+  **Grants access to:**
+  - `POST /v1/mcp/query`
+  - `POST /v1/mcp/batch-query`
+  - Semantic search over datasets
+
+  **Requires:** `datasets:read`
+</ParamField>
+
+<ParamField scope="mcp:batch_query" type="read">
+  Execute batch queries
+
+  **Grants access to:**
+  - `POST /v1/mcp/batch-query`
+  - Multi-query batch operations
+
+  **Requires:** `mcp:query`
+</ParamField>
+
+### Webhooks
+
+<ParamField scope="webhooks:manage" type="write">
+  Create and manage webhooks
+
+  **Grants access to:**
+  - `POST /v1/webhooks`
+  - `GET /v1/webhooks`
+  - `PATCH /v1/webhooks/{id}`
+  - `DELETE /v1/webhooks/{id}`
+  - Full webhook management
+</ParamField>
+
+### Account
+
+<ParamField scope="account:read" type="read">
+  Read account information
+
+  **Grants access to:**
+  - `GET /v1/account`
+  - View account details
+  - Check usage and billing
+</ParamField>
+
+## Scope Combinations
+
+### Recommended Scopes
+
+**Read-Only Access:**
+```
+datasets:read mcp:query
+```
+For applications that only need to search existing datasets.
+
+**Full Dataset Management:**
+```
+datasets:read datasets:write documents:read documents:write mcp:query
+```
+For applications managing datasets and documents.
+
+**Complete Access:**
+```
+datasets:read datasets:write datasets:delete
+documents:read documents:write documents:delete
+mcp:query mcp:batch_query
+webhooks:manage
+account:read
+```
+For admin applications with full control.
+
+## Requesting Scopes
+
+### Authorization URL
+
+```
+https://app.fltr.com/oauth/authorize?
+  response_type=code&
+  client_id=YOUR_CLIENT_ID&
+  scope=datasets:read mcp:query&
+  state=RANDOM_STATE&
+  code_challenge=CODE_CHALLENGE&
+  code_challenge_method=S256
+```
+
+**Important:** Scopes must be space-separated in the URL.
+
+### Code Example
+
+```python
+from urllib.parse import urlencode
+
+scopes = [
+    "datasets:read",
+    "documents:write",
+    "mcp:query"
+]
+
+params = {
+    "response_type": "code",
+    "client_id": "YOUR_CLIENT_ID",
+    "scope": " ".join(scopes),  # Space-separated
+    "state": state,
+    "code_challenge": code_challenge,
+    "code_challenge_method": "S256"
+}
+
+auth_url = f"https://app.fltr.com/oauth/authorize?{urlencode(params)}"
+```
+
+## Scope Hierarchy
+
+Some scopes require others:
+
+```
+datasets:delete
+  └─ requires datasets:write
+      └─ requires datasets:read
+
+documents:delete
+  └─ requires documents:read
+
+mcp:batch_query
+  └─ requires mcp:query
+      └─ requires datasets:read
+```
+
+If you request `datasets:delete`, you automatically get `datasets:write` and `datasets:read`.
+
+## Checking Granted Scopes
+
+After authentication, check which scopes were granted:
+
+```python
+# Token response includes granted scopes
+{
+  "access_token": "fltr_at_abc123...",
+  "scope": "datasets:read datasets:write mcp:query",
+  "token_type": "Bearer",
+  "expires_in": 3600
+}
+```
+
+**Note:** Users can deny some scopes. Always check the `scope` field in the token response.
+
+## Scope Changes
+
+### Adding Scopes
+
+To request additional scopes, redirect user through OAuth flow again with new scopes:
+
+```python
+# Original scopes
+original_scopes = "datasets:read mcp:query"
+
+# Request additional scope
+new_scopes = "datasets:read mcp:query webhooks:manage"
+
+# User must re-authorize
+redirect_to_authorization(scopes=new_scopes)
+```
+
+### Revoking Scopes
+
+Users can revoke scopes at any time in their account settings:
+
+1. Go to **Settings** → **Connected Apps**
+2. Click on your application
+3. Modify or revoke permissions
+
+Your application will receive `403 Forbidden` when using revoked scopes.
+
+## Error Handling
+
+### Insufficient Scope
+
+```json
+{
+  "error": "Insufficient permissions",
+  "code": "insufficient_scope",
+  "details": {
+    "required_scope": "datasets:write",
+    "granted_scopes": ["datasets:read", "mcp:query"]
+  }
+}
+```
+
+**Solution:** Request additional scopes from user.
+
+### Invalid Scope
+
+```json
+{
+  "error": "Invalid scope",
+  "code": "invalid_scope",
+  "details": {
+    "invalid_scopes": ["datasets:admin"]
+  }
+}
+```
+
+**Solution:** Use valid scope names from this page.
+
+## Best Practices
+
+### Request Minimum Scopes
+
+Only request scopes you actually need:
+
+```python
+# ✅ Good - minimal scopes
+scopes = "datasets:read mcp:query"
+
+# ❌ Bad - requesting everything
+scopes = "datasets:read datasets:write datasets:delete documents:read documents:write..."
+```
+
+### Explain Why
+
+Tell users why you need each scope:
+
+```
+This app needs:
+- datasets:read - To view your knowledge bases
+- mcp:query - To search your documents
+- webhooks:manage - To notify you of updates
+```
+
+### Handle Denials
+
+Users may deny some scopes:
+
+```python
+requested_scopes = {"datasets:read", "datasets:write", "mcp:query"}
+granted_scopes = set(token_response["scope"].split())
+
+denied_scopes = requested_scopes - granted_scopes
+
+if denied_scopes:
+    print(f"User denied: {denied_scopes}")
+    # Degrade gracefully or explain why scopes are needed
+```
+
+### Store Scope Information
+
+Save which scopes were granted:
+
+```python
+# Store with access token
+{
+    "access_token": "fltr_at_abc123...",
+    "refresh_token": "fltr_rt_def456...",
+    "scopes": ["datasets:read", "mcp:query"],
+    "expires_at": 1704657600
+}
+```
+
+## Scope Reference Table
+
+| Scope | Type | Description | Requires |
+|-------|------|-------------|----------|
+| `datasets:read` | Read | View datasets | - |
+| `datasets:write` | Write | Create/update datasets | `datasets:read` |
+| `datasets:delete` | Delete | Delete datasets | `datasets:write` |
+| `documents:read` | Read | View documents | - |
+| `documents:write` | Write | Upload documents | `documents:read` |
+| `documents:delete` | Delete | Delete documents | `documents:read` |
+| `mcp:query` | Read | Search datasets | `datasets:read` |
+| `mcp:batch_query` | Read | Batch queries | `mcp:query` |
+| `webhooks:manage` | Write | Manage webhooks | - |
+| `account:read` | Read | View account info | - |
+
+## Resources
+
+<CardGroup cols={2}>
+  <Card title="OAuth Guide" icon="shield" href="/authentication/oauth">
+    Complete OAuth implementation
+  </Card>
+
+  <Card title="API Reference" icon="book" href="/api-reference/introduction">
+    See which endpoints need which scopes
+  </Card>
+
+  <Card title="Security" icon="lock" href="/support/security">
+    OAuth security best practices
+  </Card>
+
+  <Card title="MCP Integration" icon="plug" href="/api-reference/mcp/query">
+    Use MCP endpoints with OAuth
+  </Card>
+</CardGroup>

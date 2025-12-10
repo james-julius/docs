@@ -1,0 +1,723 @@
+---
+title: 'RAG Best Practices'
+description: 'Best practices for building production-grade RAG applications with FLTR'
+---
+
+# RAG Best Practices
+
+Retrieval-Augmented Generation (RAG) combines semantic search with language models to generate accurate, grounded responses. This guide covers best practices for building production-grade RAG applications with FLTR.
+
+## What is RAG?
+
+RAG enhances LLMs by retrieving relevant context before generation:
+
+```
+User Question → Search Knowledge Base → Retrieve Context → LLM Generation → Answer
+```
+
+**Benefits:**
+- ✅ Reduces hallucinations
+- ✅ Provides citations and sources
+- ✅ Works with private/proprietary data
+- ✅ More cost-effective than fine-tuning
+
+## Architecture Patterns
+
+### Basic RAG Pattern
+
+```python
+import openai
+from fltr import FLTR
+
+client = FLTR(api_key="fltr_sk_...")
+openai.api_key = "sk-..."
+
+def answer_question(question: str, dataset_id: str) -> dict:
+    # 1. Retrieve relevant context
+    search_results = client.query(
+        dataset_id=dataset_id,
+        query=question,
+        limit=5
+    )
+
+    # 2. Build context from results
+    context = "\n\n".join([
+        f"Source {i+1}: {chunk['text']}"
+        for i, chunk in enumerate(search_results['chunks'])
+    ])
+
+    # 3. Generate answer with context
+    response = openai.ChatCompletion.create(
+        model="gpt-4",
+        messages=[
+            {"role": "system", "content": "Answer based only on the provided context."},
+            {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"}
+        ]
+    )
+
+    return {
+        "answer": response.choices[0].message.content,
+        "sources": search_results['chunks']
+    }
+```
+
+### Advanced RAG with Reranking
+
+```python
+def answer_question_advanced(question: str, dataset_id: str) -> dict:
+    # 1. Initial retrieval (cast wide net)
+    search_results = client.query(
+        dataset_id=dataset_id,
+        query=question,
+        limit=20,  # Retrieve more candidates
+        rerank=True  # Enable Cohere reranking
+    )
+
+    # 2. Take top reranked results
+    top_chunks = search_results['chunks'][:5]
+
+    # 3. Build context with metadata
+    context_parts = []
+    for i, chunk in enumerate(top_chunks):
+        metadata = chunk.get('metadata', {})
+        source = metadata.get('source', 'Unknown')
+        context_parts.append(
+            f"[Source {i+1}: {source}]\n{chunk['text']}"
+        )
+
+    context = "\n\n".join(context_parts)
+
+    # 4. Generate with structured prompt
+    response = openai.ChatCompletion.create(
+        model="gpt-4-turbo",
+        messages=[
+            {
+                "role": "system",
+                "content": """You are a helpful assistant. Answer questions based ONLY on the provided context.
+                If the context doesn't contain enough information, say so.
+                Always cite your sources using [Source N] notation."""
+            },
+            {
+                "role": "user",
+                "content": f"Context:\n{context}\n\nQuestion: {question}"
+            }
+        ],
+        temperature=0.3  # Lower temperature for more factual responses
+    )
+
+    return {
+        "answer": response.choices[0].message.content,
+        "sources": [
+            {
+                "text": chunk['text'],
+                "score": chunk['score'],
+                "metadata": chunk.get('metadata', {})
+            }
+            for chunk in top_chunks
+        ]
+    }
+```
+
+## Prompt Engineering
+
+### System Prompts
+
+**Basic system prompt:**
+```
+Answer the question based only on the provided context.
+If you don't know, say "I don't have enough information."
+```
+
+**Advanced system prompt:**
+```
+You are an expert assistant with access to a knowledge base.
+
+Instructions:
+1. Answer based ONLY on the provided context
+2. If context is insufficient, explicitly state what's missing
+3. Cite sources using [Source N] notation
+4. Be precise and concise
+5. If multiple sources conflict, acknowledge the discrepancy
+
+Format:
+- Direct answer first
+- Supporting details second
+- Citations at the end
+```
+
+**Domain-specific prompt (Technical Support):**
+```
+You are a technical support agent with access to product documentation.
+
+Instructions:
+- Provide step-by-step solutions when applicable
+- Reference specific documentation sections
+- Warn about potential pitfalls
+- Suggest related resources when helpful
+- If issue requires human support, say so clearly
+
+Tone: Professional, helpful, patient
+```
+
+### User Prompts
+
+**Bad user prompt:**
+```python
+f"Context: {context}\n\nQuestion: {question}"
+```
+
+**Good user prompt:**
+```python
+f"""Based on the following documentation excerpts, answer the user's question.
+
+Documentation:
+{context}
+
+User Question: {question}
+
+Instructions:
+- Use only information from the documentation
+- Cite sources as [Source N]
+- If unsure, say so clearly
+"""
+```
+
+## Retrieval Strategies
+
+### 1. Hybrid Search (Default)
+
+FLTR uses hybrid search by default (vector + keyword):
+
+```python
+results = client.query(
+    dataset_id="ds_abc123",
+    query="How do I reset my password?",
+    limit=10
+)
+```
+
+**Best for:**
+- General-purpose search
+- Balanced precision and recall
+- Questions with specific keywords
+
+### 2. Semantic-Only Search
+
+```python
+# Query is already semantic by default in FLTR
+# Just ensure your query is natural language
+results = client.query(
+    dataset_id="ds_abc123",
+    query="What is the process for recovering access to my account?",
+    limit=10
+)
+```
+
+**Best for:**
+- Conceptual questions
+- Paraphrased queries
+- When exact keywords unknown
+
+### 3. Filtered Search
+
+```python
+# Search within specific document types
+results = client.query(
+    dataset_id="ds_abc123",
+    query="API authentication",
+    filters={
+        "metadata.category": "technical-docs",
+        "metadata.version": "v2"
+    },
+    limit=10
+)
+```
+
+**Best for:**
+- Domain-specific queries
+- Version-specific information
+- Filtered by date, category, author, etc.
+
+### 4. Multi-Query Fusion
+
+```python
+def multi_query_search(question: str, dataset_id: str) -> list:
+    # Generate multiple query variations
+    variations = [
+        question,
+        f"How to {question.lower()}",
+        f"Steps for {question.lower()}",
+        f"Guide: {question}"
+    ]
+
+    all_results = []
+    seen_chunks = set()
+
+    for query_variant in variations:
+        results = client.query(
+            dataset_id=dataset_id,
+            query=query_variant,
+            limit=5
+        )
+
+        for chunk in results['chunks']:
+            chunk_id = chunk['id']
+            if chunk_id not in seen_chunks:
+                seen_chunks.add(chunk_id)
+                all_results.append(chunk)
+
+    # Sort by score
+    all_results.sort(key=lambda x: x['score'], reverse=True)
+
+    return all_results[:10]
+```
+
+**Best for:**
+- Complex questions
+- When single query might miss relevant content
+- Higher recall needed
+
+## Context Management
+
+### Context Length Optimization
+
+```python
+def build_optimized_context(chunks: list, max_tokens: int = 3000) -> str:
+    """Build context that fits within token budget."""
+    import tiktoken
+
+    encoder = tiktoken.encoding_for_model("gpt-4")
+    context_parts = []
+    total_tokens = 0
+
+    for i, chunk in enumerate(chunks):
+        chunk_text = f"[Source {i+1}]\n{chunk['text']}\n"
+        chunk_tokens = len(encoder.encode(chunk_text))
+
+        if total_tokens + chunk_tokens > max_tokens:
+            break
+
+        context_parts.append(chunk_text)
+        total_tokens += chunk_tokens
+
+    return "\n".join(context_parts)
+```
+
+### Context Windowing
+
+```python
+def sliding_window_context(question: str, dataset_id: str, window_size: int = 3):
+    """Use sliding window for long documents."""
+    results = client.query(
+        dataset_id=dataset_id,
+        query=question,
+        limit=20
+    )
+
+    # Group chunks by document
+    docs = {}
+    for chunk in results['chunks']:
+        doc_id = chunk['metadata'].get('document_id')
+        if doc_id not in docs:
+            docs[doc_id] = []
+        docs[doc_id].append(chunk)
+
+    # For each document, take consecutive chunks
+    windowed_chunks = []
+    for doc_id, chunks in docs.items():
+        # Sort by position
+        chunks.sort(key=lambda x: x['metadata'].get('chunk_index', 0))
+
+        # Take window around best match
+        best_idx = 0
+        best_score = chunks[0]['score']
+
+        for i, chunk in enumerate(chunks):
+            if chunk['score'] > best_score:
+                best_score = chunk['score']
+                best_idx = i
+
+        # Window around best match
+        start = max(0, best_idx - window_size // 2)
+        end = min(len(chunks), start + window_size)
+
+        windowed_chunks.extend(chunks[start:end])
+
+    return windowed_chunks
+```
+
+## Response Generation
+
+### Structured Outputs
+
+```python
+from pydantic import BaseModel
+
+class Answer(BaseModel):
+    answer: str
+    confidence: float  # 0-1
+    sources: list[int]  # Source indices
+    followup_questions: list[str]
+
+def generate_structured_answer(question: str, context: str) -> Answer:
+    response = openai.ChatCompletion.create(
+        model="gpt-4-turbo",
+        messages=[
+            {
+                "role": "system",
+                "content": "You are a helpful assistant. Respond with structured JSON."
+            },
+            {
+                "role": "user",
+                "content": f"""Context:\n{context}\n\nQuestion: {question}
+
+Respond with JSON:
+{{
+  "answer": "Your answer here",
+  "confidence": 0.95,
+  "sources": [1, 3, 5],
+  "followup_questions": ["Related question 1", "Related question 2"]
+}}"""
+            }
+        ],
+        response_format={"type": "json_object"}
+    )
+
+    return Answer.parse_raw(response.choices[0].message.content)
+```
+
+### Citation Formatting
+
+```python
+def format_answer_with_citations(answer: str, sources: list) -> str:
+    """Add citation footnotes to answer."""
+    formatted = answer
+
+    # Add citation numbers
+    for i, source in enumerate(sources, 1):
+        # Replace [Source N] with superscript
+        formatted = formatted.replace(f"[Source {i}]", f"[{i}]")
+
+    # Add footnotes
+    formatted += "\n\n---\n**Sources:**\n"
+    for i, source in enumerate(sources, 1):
+        metadata = source.get('metadata', {})
+        title = metadata.get('title', 'Unknown')
+        url = metadata.get('url', '')
+
+        citation = f"[{i}] {title}"
+        if url:
+            citation += f" ({url})"
+
+        formatted += f"\n{citation}"
+
+    return formatted
+```
+
+## Error Handling
+
+### Fallback Strategies
+
+```python
+def answer_with_fallback(question: str, dataset_id: str) -> dict:
+    try:
+        # Try primary search
+        results = client.query(
+            dataset_id=dataset_id,
+            query=question,
+            limit=5,
+            rerank=True
+        )
+
+        if not results['chunks']:
+            # Fallback 1: Try broader search
+            results = client.query(
+                dataset_id=dataset_id,
+                query=question,
+                limit=10,
+                rerank=False
+            )
+
+        if not results['chunks']:
+            # Fallback 2: Try keyword extraction
+            keywords = extract_keywords(question)
+            results = client.query(
+                dataset_id=dataset_id,
+                query=" ".join(keywords),
+                limit=10
+            )
+
+        if not results['chunks']:
+            # Fallback 3: Return canned response
+            return {
+                "answer": "I don't have enough information to answer this question. Please try rephrasing or contact support.",
+                "sources": [],
+                "fallback": True
+            }
+
+        # Generate answer
+        return generate_answer(question, results['chunks'])
+
+    except Exception as e:
+        logger.error(f"Error answering question: {e}")
+        return {
+            "answer": "I'm experiencing technical difficulties. Please try again later.",
+            "sources": [],
+            "error": True
+        }
+```
+
+### Quality Checks
+
+```python
+def validate_answer_quality(answer: str, sources: list, question: str) -> dict:
+    """Check answer quality before returning."""
+    issues = []
+
+    # Check 1: Answer not empty
+    if not answer or len(answer) < 10:
+        issues.append("Answer too short")
+
+    # Check 2: Sources cited
+    if "[" not in answer and len(sources) > 0:
+        issues.append("Sources not cited")
+
+    # Check 3: Relevant sources
+    if len(sources) > 0:
+        avg_score = sum(s['score'] for s in sources) / len(sources)
+        if avg_score < 0.5:
+            issues.append("Low relevance scores")
+
+    # Check 4: Not a refusal
+    refusal_phrases = [
+        "I don't know",
+        "I cannot answer",
+        "insufficient information"
+    ]
+    if any(phrase in answer.lower() for phrase in refusal_phrases):
+        issues.append("Answer is a refusal")
+
+    return {
+        "valid": len(issues) == 0,
+        "issues": issues,
+        "quality_score": 1.0 - (len(issues) * 0.25)
+    }
+```
+
+## Performance Optimization
+
+### Caching Strategy
+
+```python
+import hashlib
+from functools import lru_cache
+
+# Cache search results
+@lru_cache(maxsize=1000)
+def cached_search(query_hash: str, dataset_id: str) -> dict:
+    return client.query(
+        dataset_id=dataset_id,
+        query=query_hash,
+        limit=10
+    )
+
+def search_with_cache(query: str, dataset_id: str) -> dict:
+    # Hash query for cache key
+    query_hash = hashlib.md5(query.lower().encode()).hexdigest()
+    return cached_search(query_hash, dataset_id)
+```
+
+<Card title="Caching Guide" icon="bolt" href="/guides/caching">
+  Learn more about caching strategies →
+</Card>
+
+### Batch Processing
+
+```python
+def batch_answer_questions(questions: list[str], dataset_id: str) -> list[dict]:
+    """Process multiple questions efficiently."""
+    # Use batch query API
+    results = client.batch_query(
+        queries=[
+            {"dataset_id": dataset_id, "query": q, "limit": 5}
+            for q in questions
+        ]
+    )
+
+    # Batch LLM calls
+    messages = []
+    for i, question in enumerate(questions):
+        chunks = results[i]['chunks']
+        context = "\n\n".join([c['text'] for c in chunks])
+        messages.append({
+            "role": "user",
+            "content": f"Context: {context}\n\nQuestion: {question}"
+        })
+
+    # Single API call for all questions
+    llm_responses = openai.ChatCompletion.create(
+        model="gpt-4-turbo",
+        messages=messages
+    )
+
+    return [
+        {
+            "question": questions[i],
+            "answer": llm_responses.choices[i].message.content,
+            "sources": results[i]['chunks']
+        }
+        for i in range(len(questions))
+    ]
+```
+
+## Monitoring & Evaluation
+
+### Logging
+
+```python
+import logging
+
+logger = logging.getLogger(__name__)
+
+def answer_with_logging(question: str, dataset_id: str) -> dict:
+    logger.info(f"Question received: {question[:100]}...")
+
+    # Search
+    start = time.time()
+    results = client.query(dataset_id=dataset_id, query=question)
+    search_time = time.time() - start
+
+    logger.info(f"Search completed in {search_time:.2f}s, {len(results['chunks'])} chunks found")
+
+    # Generate
+    start = time.time()
+    answer = generate_answer(question, results['chunks'])
+    generation_time = time.time() - start
+
+    logger.info(f"Generation completed in {generation_time:.2f}s")
+
+    # Log metrics
+    logger.info(f"Total time: {search_time + generation_time:.2f}s")
+    logger.info(f"Avg source score: {sum(c['score'] for c in results['chunks']) / len(results['chunks']):.2f}")
+
+    return answer
+```
+
+### A/B Testing
+
+```python
+import random
+
+def answer_with_ab_test(question: str, dataset_id: str, user_id: str) -> dict:
+    # Assign user to variant
+    variant = "A" if hash(user_id) % 2 == 0 else "B"
+
+    if variant == "A":
+        # Variant A: Standard retrieval
+        results = client.query(dataset_id=dataset_id, query=question, limit=5)
+    else:
+        # Variant B: With reranking
+        results = client.query(dataset_id=dataset_id, query=question, limit=10, rerank=True)
+
+    answer = generate_answer(question, results['chunks'])
+
+    # Log variant for analysis
+    log_answer_event({
+        "user_id": user_id,
+        "question": question,
+        "variant": variant,
+        "answer": answer,
+        "num_sources": len(results['chunks'])
+    })
+
+    return answer
+```
+
+## Common Pitfalls
+
+### ❌ Over-Retrieval
+
+```python
+# BAD: Retrieving too much context
+results = client.query(dataset_id="ds_abc", query=question, limit=50)
+```
+
+**Why it's bad:**
+- Slows down generation
+- Increases costs
+- May confuse the LLM with irrelevant info
+
+**Fix:**
+```python
+# GOOD: Retrieve what you need
+results = client.query(dataset_id="ds_abc", query=question, limit=5, rerank=True)
+```
+
+### ❌ Ignoring Relevance Scores
+
+```python
+# BAD: Using all results regardless of score
+context = "\n".join([c['text'] for c in results['chunks']])
+```
+
+**Fix:**
+```python
+# GOOD: Filter by relevance threshold
+relevant_chunks = [c for c in results['chunks'] if c['score'] > 0.7]
+context = "\n".join([c['text'] for c in relevant_chunks])
+```
+
+### ❌ No Fallback Handling
+
+```python
+# BAD: Assuming results always exist
+answer = generate_answer(question, results['chunks'])
+```
+
+**Fix:**
+```python
+# GOOD: Handle empty results
+if not results['chunks']:
+    return "I don't have enough information to answer this question."
+
+answer = generate_answer(question, results['chunks'])
+```
+
+## Production Checklist
+
+- [ ] Implement caching for frequent queries
+- [ ] Add fallback strategies for no/low-quality results
+- [ ] Log all queries and responses for analysis
+- [ ] Monitor search relevance scores
+- [ ] Set up A/B testing for improvements
+- [ ] Implement rate limiting
+- [ ] Add quality validation before returning answers
+- [ ] Use structured outputs for consistency
+- [ ] Optimize context length for cost
+- [ ] Add user feedback collection
+
+## Additional Resources
+
+<CardGroup cols={2}>
+  <Card title="First Integration" icon="rocket" href="/quickstart/first-integration">
+    Build your first RAG app
+  </Card>
+
+  <Card title="Caching Guide" icon="bolt" href="/guides/caching">
+    Optimize with caching
+  </Card>
+
+  <Card title="MCP API" icon="magnifying-glass" href="/api-reference/mcp/query">
+    MCP query endpoint reference
+  </Card>
+
+  <Card title="Troubleshooting" icon="wrench" href="/support/troubleshooting">
+    Common issues and solutions
+  </Card>
+</CardGroup>
+
+## Questions?
+
+Need help building your RAG application? Check our documentation or contact support.
+
+**Support:** support@fltr.com

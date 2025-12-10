@@ -1,0 +1,566 @@
+---
+title: 'CORS Configuration'
+description: 'Cross-Origin Resource Sharing setup for web applications'
+---
+
+# CORS Configuration
+
+CORS (Cross-Origin Resource Sharing) allows your web applications to make requests to the FLTR API from browsers. This guide covers how to configure CORS for your application.
+
+## What is CORS?
+
+CORS is a security feature in browsers that restricts web pages from making requests to a different domain than the one that served the page.
+
+**Example:**
+```
+Your app:     https://myapp.com
+FLTR API:     https://api.fltr.com
+
+Without CORS: ❌ Browser blocks the request
+With CORS:    ✅ Browser allows the request
+```
+
+## FLTR CORS Policy
+
+### Default Policy
+
+FLTR API has a **permissive CORS policy** for ease of development:
+
+```
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+Access-Control-Allow-Headers: Authorization, Content-Type, Idempotency-Key
+Access-Control-Max-Age: 86400
+```
+
+This means:
+- ✅ Any origin can make requests
+- ✅ All standard HTTP methods allowed
+- ✅ Common headers allowed
+- ✅ Preflight responses cached for 24 hours
+
+### Production Recommendations
+
+For production applications, we recommend:
+
+1. **Use server-side API calls** instead of client-side
+2. **Proxy requests** through your own backend
+3. **Use session-based auth** for browser applications
+4. **Implement origin validation** in your application
+
+<Warning>
+**Security Note:** Client-side API calls expose your API keys in browser network traffic. Always use server-side proxies for production.
+</Warning>
+
+## Configuration by Framework
+
+### React
+
+#### Option 1: Environment Variables (Development)
+
+```javascript
+// .env.local
+REACT_APP_FLTR_API_URL=https://api.fltr.com/v1
+REACT_APP_FLTR_API_KEY=fltr_sk_test_...
+
+// src/api/fltr.js
+const API_URL = process.env.REACT_APP_FLTR_API_URL;
+const API_KEY = process.env.REACT_APP_FLTR_API_KEY;
+
+export async function queryDataset(datasetId, query) {
+  const response = await fetch(`${API_URL}/mcp/query`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ dataset_id: datasetId, query })
+  });
+
+  return response.json();
+}
+```
+
+<Warning>
+This approach exposes your API key to clients. Only use test keys in development.
+</Warning>
+
+#### Option 2: Proxy Through Backend (Production)
+
+```javascript
+// src/api/fltr.js
+export async function queryDataset(datasetId, query) {
+  // Call your backend instead of FLTR directly
+  const response = await fetch('/api/fltr/query', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    credentials: 'include', // Send cookies
+    body: JSON.stringify({ dataset_id: datasetId, query })
+  });
+
+  return response.json();
+}
+```
+
+```javascript
+// backend/routes/fltr.js (Node.js/Express)
+app.post('/api/fltr/query', async (req, res) => {
+  const { dataset_id, query } = req.body;
+
+  // API key stays on server
+  const response = await fetch('https://api.fltr.com/v1/mcp/query', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.FLTR_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ dataset_id, query })
+  });
+
+  const data = await response.json();
+  res.json(data);
+});
+```
+
+### Next.js
+
+#### Option 1: API Routes (Recommended)
+
+```typescript
+// pages/api/fltr/query.ts
+import type { NextApiRequest, NextApiResponse } from 'next';
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const { dataset_id, query } = req.body;
+
+  try {
+    const response = await fetch('https://api.fltr.com/v1/mcp/query', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.FLTR_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ dataset_id, query })
+    });
+
+    const data = await response.json();
+    res.status(200).json(data);
+  } catch (error) {
+    res.status(500).json({ error: 'Query failed' });
+  }
+}
+```
+
+```typescript
+// app/components/SearchBox.tsx
+'use client';
+
+export function SearchBox() {
+  const handleSearch = async (query: string) => {
+    const response = await fetch('/api/fltr/query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        dataset_id: 'ds_abc123',
+        query
+      })
+    });
+
+    const results = await response.json();
+    return results;
+  };
+
+  // ... rest of component
+}
+```
+
+#### Option 2: Server Components
+
+```typescript
+// app/search/page.tsx
+import { headers } from 'next/headers';
+
+async function queryDataset(query: string) {
+  const response = await fetch('https://api.fltr.com/v1/mcp/query', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.FLTR_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      dataset_id: 'ds_abc123',
+      query
+    })
+  });
+
+  return response.json();
+}
+
+export default async function SearchPage({
+  searchParams
+}: {
+  searchParams: { q: string }
+}) {
+  const results = await queryDataset(searchParams.q);
+
+  return (
+    <div>
+      {results.chunks.map(chunk => (
+        <div key={chunk.id}>{chunk.text}</div>
+      ))}
+    </div>
+  );
+}
+```
+
+### Vue.js
+
+#### Development Setup
+
+```javascript
+// src/api/fltr.js
+import axios from 'axios';
+
+const api = axios.create({
+  baseURL: import.meta.env.VITE_FLTR_API_URL,
+  headers: {
+    'Authorization': `Bearer ${import.meta.env.VITE_FLTR_API_KEY}`,
+    'Content-Type': 'application/json'
+  }
+});
+
+export const fltrApi = {
+  async query(datasetId, query) {
+    const response = await api.post('/mcp/query', {
+      dataset_id: datasetId,
+      query
+    });
+    return response.data;
+  }
+};
+```
+
+```javascript
+// .env.local
+VITE_FLTR_API_URL=https://api.fltr.com/v1
+VITE_FLTR_API_KEY=fltr_sk_test_...
+```
+
+#### Production Setup (Proxy)
+
+```javascript
+// vite.config.js
+export default {
+  server: {
+    proxy: {
+      '/api/fltr': {
+        target: 'http://localhost:3000', // Your backend
+        changeOrigin: true
+      }
+    }
+  }
+};
+```
+
+```javascript
+// src/api/fltr.js
+export const fltrApi = {
+  async query(datasetId, query) {
+    const response = await fetch('/api/fltr/query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ dataset_id: datasetId, query })
+    });
+    return response.json();
+  }
+};
+```
+
+### Angular
+
+#### Development
+
+```typescript
+// src/environments/environment.ts
+export const environment = {
+  production: false,
+  fltrApiUrl: 'https://api.fltr.com/v1',
+  fltrApiKey: 'fltr_sk_test_...'
+};
+```
+
+```typescript
+// src/app/services/fltr.service.ts
+import { Injectable } from '@angular/core';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { environment } from '../../environments/environment';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class FltrService {
+  private apiUrl = environment.fltrApiUrl;
+  private headers = new HttpHeaders({
+    'Authorization': `Bearer ${environment.fltrApiKey}`,
+    'Content-Type': 'application/json'
+  });
+
+  constructor(private http: HttpClient) {}
+
+  query(datasetId: string, query: string) {
+    return this.http.post(
+      `${this.apiUrl}/mcp/query`,
+      { dataset_id: datasetId, query },
+      { headers: this.headers }
+    );
+  }
+}
+```
+
+#### Production (Proxy)
+
+```json
+// proxy.conf.json
+{
+  "/api/fltr": {
+    "target": "http://localhost:3000",
+    "secure": false,
+    "changeOrigin": true
+  }
+}
+```
+
+```typescript
+// src/app/services/fltr.service.ts
+query(datasetId: string, query: string) {
+  return this.http.post(
+    '/api/fltr/query', // Proxied to backend
+    { dataset_id: datasetId, query },
+    { withCredentials: true }
+  );
+}
+```
+
+## Common CORS Issues
+
+### Issue: "No 'Access-Control-Allow-Origin' header"
+
+**Error:**
+```
+Access to fetch at 'https://api.fltr.com/v1/datasets' from origin 'http://localhost:3000'
+has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present.
+```
+
+**This should not happen with FLTR API**, but if it does:
+
+1. Check your API endpoint URL is correct
+2. Verify you're using `https://api.fltr.com`, not `http://`
+3. Check for network issues or proxy interference
+
+### Issue: "Authorization header blocked"
+
+**Error:**
+```
+Request header field Authorization is not allowed by Access-Control-Allow-Headers
+```
+
+**Solution:** FLTR allows the `Authorization` header. This usually means:
+- You're using a custom proxy that strips headers
+- Browser extension is interfering
+- Network proxy is blocking headers
+
+### Issue: Preflight Request Failing
+
+**Error:**
+```
+Response to preflight request doesn't pass access control check
+```
+
+**Cause:** Browsers send an OPTIONS request before POST/PUT/DELETE requests.
+
+**Solution:** FLTR handles OPTIONS requests automatically. If failing:
+- Check your API key is valid
+- Ensure you're not blocking OPTIONS requests in your app
+- Verify network allows OPTIONS method
+
+### Issue: Credentials Mode Error
+
+**Error:**
+```
+The value of the 'Access-Control-Allow-Origin' header must not be '*' when the
+request's credentials mode is 'include'
+```
+
+**Solution:** Don't use `credentials: 'include'` when calling FLTR directly:
+
+```javascript
+// ❌ Don't do this with FLTR API
+fetch('https://api.fltr.com/v1/datasets', {
+  credentials: 'include'  // Remove this
+});
+
+// ✅ Do this instead
+fetch('https://api.fltr.com/v1/datasets', {
+  headers: {
+    'Authorization': `Bearer ${API_KEY}`
+  }
+});
+```
+
+## Security Best Practices
+
+### 1. Never Expose Production API Keys
+
+```javascript
+// ❌ BAD - API key exposed to browser
+const API_KEY = 'fltr_sk_live_abc123...';
+fetch('https://api.fltr.com/v1/datasets', {
+  headers: { 'Authorization': `Bearer ${API_KEY}` }
+});
+
+// ✅ GOOD - API key on server
+fetch('/api/fltr/datasets', {
+  credentials: 'include'  // Send session cookie
+});
+```
+
+### 2. Use Environment Variables
+
+```bash
+# .env (DO NOT COMMIT)
+FLTR_API_KEY=fltr_sk_live_...
+
+# .env.example (Safe to commit)
+FLTR_API_KEY=fltr_sk_test_...
+```
+
+```javascript
+// Use environment variable
+const apiKey = process.env.FLTR_API_KEY;
+```
+
+### 3. Implement Rate Limiting
+
+```javascript
+// backend/middleware/rateLimit.js
+const rateLimit = require('express-rate-limit');
+
+const fltrLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 100, // Limit each IP to 100 requests per hour
+  message: 'Too many requests from this IP'
+});
+
+app.use('/api/fltr', fltrLimiter);
+```
+
+### 4. Validate Requests
+
+```javascript
+// backend/routes/fltr.js
+app.post('/api/fltr/query', async (req, res) => {
+  const { dataset_id, query } = req.body;
+
+  // Validate inputs
+  if (!dataset_id || !query) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  if (query.length > 500) {
+    return res.status(400).json({ error: 'Query too long' });
+  }
+
+  // Whitelist allowed datasets
+  const allowedDatasets = ['ds_abc123', 'ds_def456'];
+  if (!allowedDatasets.includes(dataset_id)) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+
+  // Proceed with API call...
+});
+```
+
+### 5. Use HTTPS Only
+
+```javascript
+// Redirect HTTP to HTTPS
+app.use((req, res, next) => {
+  if (req.header('x-forwarded-proto') !== 'https') {
+    res.redirect(`https://${req.header('host')}${req.url}`);
+  } else {
+    next();
+  }
+});
+```
+
+## Testing CORS
+
+### Browser DevTools
+
+1. Open DevTools (F12)
+2. Go to Network tab
+3. Make a request
+4. Check response headers:
+
+```
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+Access-Control-Allow-Headers: Authorization, Content-Type, Idempotency-Key
+```
+
+### cURL (Does Not Trigger CORS)
+
+CORS is a browser security feature. cURL requests don't trigger CORS:
+
+```bash
+# This works regardless of CORS
+curl -X POST https://api.fltr.com/v1/mcp/query \
+  -H "Authorization: Bearer fltr_sk_..." \
+  -H "Content-Type: application/json" \
+  -d '{"dataset_id":"ds_abc123","query":"test"}'
+```
+
+### Postman (Does Not Trigger CORS)
+
+Postman also bypasses CORS. Use browsers to test CORS.
+
+## Additional Resources
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/authentication/overview">
+    Secure authentication methods
+  </Card>
+
+  <Card title="Security" icon="shield" href="/support/security">
+    Security best practices
+  </Card>
+
+  <Card title="Session Auth" icon="cookie" href="/authentication/sessions">
+    Browser-based authentication
+  </Card>
+
+  <Card title="Rate Limits" icon="gauge" href="/support/rate-limits">
+    API rate limiting
+  </Card>
+</CardGroup>
+
+## Questions?
+
+If you're having CORS issues:
+
+- Check browser DevTools console for specific error messages
+- Verify you're using correct API endpoints
+- Consider using server-side proxy for production
+- Contact support if issues persist
+
+**Support:** support@fltr.com

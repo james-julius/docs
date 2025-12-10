@@ -1,0 +1,418 @@
+---
+title: 'Security'
+description: 'Security practices, compliance, and data protection at FLTR'
+---
+
+# Security
+
+FLTR takes security seriously. This page outlines our security practices, compliance certifications, and how we protect your data.
+
+## Data Encryption
+
+### In Transit
+
+All data transmitted to and from FLTR is encrypted using **TLS 1.3** (Transport Layer Security):
+
+- API endpoints only accept HTTPS connections
+- HTTP requests are automatically redirected to HTTPS
+- TLS 1.2 and below are not supported
+- Perfect Forward Secrecy (PFS) enabled
+
+### At Rest
+
+All data stored in FLTR databases and file systems is encrypted using **AES-256**:
+
+- Database encryption at rest
+- File storage encryption (documents, embeddings)
+- Encrypted backups
+- Secure key management with automatic rotation
+
+### Encryption in Processing
+
+- Documents are encrypted during processing pipelines
+- Embedding generation uses encrypted memory
+- Temporary files are encrypted and securely deleted
+
+## Authentication & Access Control
+
+### Authentication Methods
+
+FLTR supports multiple authentication methods with varying security levels:
+
+| Method | Security Level | Rate Limit | Recommended For |
+|--------|----------------|------------|-----------------|
+| API Keys | High | 1,000/hour | Server-to-server |
+| OAuth 2.1 + PKCE | Very High | 15,000/hour | User applications |
+| Session Cookies | High | 15,000/hour | Web applications |
+
+<Card title="Authentication Guide" icon="key" href="/authentication/overview">
+  Learn about authentication methods →
+</Card>
+
+### API Key Security
+
+**Best Practices:**
+- Store keys in environment variables, never in code
+- Rotate keys every 90 days
+- Use separate keys for development and production
+- Revoke compromised keys immediately
+
+**Key Format:**
+```
+fltr_sk_live_abc123...  (Production)
+fltr_sk_test_xyz789...  (Testing)
+```
+
+### OAuth Security
+
+FLTR implements **OAuth 2.1** with **PKCE** (Proof Key for Code Exchange):
+
+- Authorization Code flow with PKCE required
+- No implicit flow support (deprecated for security)
+- Short-lived access tokens (1 hour)
+- Secure refresh token rotation
+- Scope-based permissions
+
+<Card title="OAuth Guide" icon="shield" href="/authentication/oauth">
+  Complete OAuth implementation →
+</Card>
+
+## Access Control
+
+### User Permissions
+
+FLTR uses role-based access control (RBAC):
+
+**Roles:**
+- **Owner** - Full account access, billing, user management
+- **Admin** - Manage datasets, documents, API keys
+- **Developer** - Create and query datasets
+- **Viewer** - Read-only access to datasets
+
+**Permissions Matrix:**
+
+| Action | Owner | Admin | Developer | Viewer |
+|--------|-------|-------|-----------|--------|
+| Create datasets | ✅ | ✅ | ✅ | ❌ |
+| Upload documents | ✅ | ✅ | ✅ | ❌ |
+| Query datasets | ✅ | ✅ | ✅ | ✅ |
+| Delete datasets | ✅ | ✅ | ❌ | ❌ |
+| Manage API keys | ✅ | ✅ | ❌ | ❌ |
+| Billing & invoices | ✅ | ❌ | ❌ | ❌ |
+
+### OAuth Scopes
+
+Fine-grained permissions for OAuth applications:
+
+```
+datasets:read       - View datasets
+datasets:write      - Create/update datasets
+datasets:delete     - Delete datasets
+documents:read      - View documents
+documents:write     - Upload documents
+documents:delete    - Delete documents
+mcp:query          - Search datasets
+webhooks:manage    - Manage webhooks
+account:read       - View account info
+```
+
+<Card title="Scopes Reference" icon="list" href="/authentication/scopes">
+  Complete scope documentation →
+</Card>
+
+## Compliance & Certifications
+
+### SOC 2 Type II
+
+FLTR is **SOC 2 Type II certified**:
+
+- Annual third-party audits
+- Security, availability, and confidentiality controls
+- Continuous monitoring and improvement
+
+**Audit Reports:** Available to enterprise customers under NDA.
+
+### GDPR Compliance
+
+FLTR is fully compliant with **GDPR** (General Data Protection Regulation):
+
+- **Right to Access** - Export your data anytime
+- **Right to Deletion** - Delete all data on request
+- **Data Portability** - Download data in standard formats
+- **Privacy by Design** - Minimal data collection
+- **Data Processing Agreements** - Available for enterprise
+
+**GDPR Features:**
+```python
+# Export all your data
+GET /v1/account/export
+
+# Delete all your data
+DELETE /v1/account
+
+# Download privacy report
+GET /v1/account/privacy
+```
+
+### CCPA Compliance
+
+FLTR complies with **CCPA** (California Consumer Privacy Act):
+
+- Transparent data collection practices
+- Easy opt-out mechanisms
+- No sale of personal information
+- Annual privacy disclosures
+
+### HIPAA Compliance
+
+**Coming Soon:** HIPAA compliance for healthcare customers (Q2 2025).
+
+## Data Protection
+
+### Data Residency
+
+**Available Regions:**
+- 🇺🇸 **United States** (us-east-1, us-west-2)
+- 🇪🇺 **European Union** (eu-west-1, eu-central-1)
+- 🇬🇧 **United Kingdom** (eu-west-2)
+
+**Configure region in your account settings:**
+```bash
+# API request
+PATCH /v1/account/settings
+{
+  "data_region": "eu-west-1"
+}
+```
+
+**Data never leaves your chosen region** - embeddings, vectors, and documents are all stored in-region.
+
+### Data Retention
+
+**Active Data:**
+- Datasets and documents: Retained until you delete them
+- Query logs: 90 days
+- Audit logs: 1 year (enterprise), 90 days (standard)
+
+**Deleted Data:**
+- Soft delete: 30 days (recoverable)
+- Hard delete: Permanent after 30 days
+- Backups: Encrypted, 90-day retention
+
+**Delete everything:**
+```bash
+# Delete specific dataset
+DELETE /v1/datasets/{dataset_id}
+
+# Delete your entire account
+DELETE /v1/account
+```
+
+### Data Backup
+
+- **Automated backups** every 6 hours
+- **Point-in-time recovery** up to 30 days
+- **Geo-redundant storage** (3 copies minimum)
+- **Encrypted backups** with AES-256
+- **Annual disaster recovery drills**
+
+## Network Security
+
+### Infrastructure
+
+- **Cloud Provider:** AWS (SOC 2, ISO 27001 certified)
+- **DDoS Protection:** AWS Shield Advanced
+- **WAF:** Web Application Firewall with custom rules
+- **VPC Isolation:** Private subnets for databases
+- **Network Monitoring:** 24/7 intrusion detection
+
+### API Security
+
+**Rate Limiting:**
+- Prevents abuse and DDoS attacks
+- Automatic IP blocking for suspicious activity
+- Per-user and per-IP limits
+
+**Request Validation:**
+- JSON schema validation
+- Input sanitization
+- SQL injection prevention
+- XSS protection
+
+**CORS Configuration:**
+```javascript
+// Allowed origins must be whitelisted
+Access-Control-Allow-Origin: https://your-app.com
+Access-Control-Allow-Methods: GET, POST, PUT, DELETE
+Access-Control-Allow-Headers: Authorization, Content-Type
+```
+
+<Card title="CORS Configuration" icon="globe" href="/support/cors">
+  Configure CORS for your app →
+</Card>
+
+## Vulnerability Management
+
+### Security Monitoring
+
+- **Automated vulnerability scanning** (daily)
+- **Dependency updates** within 48 hours of CVE disclosure
+- **Penetration testing** (quarterly, third-party)
+- **Bug bounty program** (coming soon)
+
+### Incident Response
+
+**Response Time SLAs:**
+- Critical: 1 hour
+- High: 4 hours
+- Medium: 24 hours
+- Low: 5 business days
+
+**Incident Process:**
+1. **Detection** - Automated alerts, user reports
+2. **Containment** - Isolate affected systems
+3. **Investigation** - Root cause analysis
+4. **Remediation** - Fix vulnerability
+5. **Notification** - Inform affected users (within 72 hours)
+6. **Post-Mortem** - Document and improve
+
+### Reporting Security Issues
+
+**Found a security vulnerability?**
+
+🔒 **Email:** security@fltr.com
+🔑 **PGP Key:** [Download public key](https://fltr.com/security.asc)
+
+**Please include:**
+- Description of the vulnerability
+- Steps to reproduce
+- Potential impact
+- Your contact information
+
+**We commit to:**
+- Acknowledge receipt within 24 hours
+- Provide status updates every 48 hours
+- Credit you in our security acknowledgments (if desired)
+
+## Application Security
+
+### Code Security
+
+- **Static analysis** on every commit
+- **Dependency scanning** for known vulnerabilities
+- **Code review** required for all changes
+- **Automated testing** (unit, integration, security)
+
+### Secrets Management
+
+- **No secrets in code** - all credentials in secure vaults
+- **Automatic rotation** of database passwords, API keys
+- **Least privilege** - services have minimal permissions
+- **Audit logging** for all secret access
+
+## Privacy Practices
+
+### Data Collection
+
+**We collect:**
+- Account information (email, name)
+- Usage data (API calls, query patterns)
+- Billing information (encrypted, PCI-compliant)
+
+**We do NOT collect:**
+- Contents of your documents (except for processing)
+- Personal data from your users
+- Browsing history outside our platform
+
+### Data Sharing
+
+**We never sell your data.**
+
+**We share data only when:**
+- Required by law (with court order)
+- You explicitly authorize (OAuth grants)
+- Anonymous analytics (aggregated, non-identifiable)
+
+**Third-party services:**
+- **Stripe** - Payment processing (PCI-DSS Level 1)
+- **AWS** - Infrastructure (SOC 2 Type II)
+- **Cloudflare** - DDoS protection, CDN
+
+## Enterprise Security
+
+### SSO (Single Sign-On)
+
+**Coming Soon** - SAML 2.0 support for enterprise:
+
+- Okta integration
+- Azure AD integration
+- Google Workspace integration
+- Custom SAML providers
+
+### Advanced Features
+
+**Enterprise Plan includes:**
+- Dedicated encryption keys (BYOK)
+- Private VPC deployment
+- Custom data retention policies
+- Advanced audit logging
+- 24/7 security support
+- SOC 2 audit reports
+
+<Card title="Enterprise Plan" icon="building" href="/pricing">
+  Learn about Enterprise features →
+</Card>
+
+## Security Checklist
+
+### For Developers
+
+- [ ] Store API keys in environment variables
+- [ ] Enable HTTPS for all requests
+- [ ] Rotate API keys every 90 days
+- [ ] Use OAuth for user-facing applications
+- [ ] Implement proper error handling
+- [ ] Validate all user inputs
+- [ ] Enable rate limiting in your app
+- [ ] Monitor API usage regularly
+
+### For Organizations
+
+- [ ] Enable multi-factor authentication (MFA)
+- [ ] Assign least-privilege roles to users
+- [ ] Review access logs monthly
+- [ ] Configure CORS policies
+- [ ] Set up webhook signature verification
+- [ ] Implement data retention policies
+- [ ] Train team on security best practices
+- [ ] Have incident response plan
+
+## Additional Resources
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/authentication/overview">
+    Secure authentication methods
+  </Card>
+
+  <Card title="OAuth Scopes" icon="shield" href="/authentication/scopes">
+    Fine-grained permissions
+  </Card>
+
+  <Card title="Rate Limits" icon="gauge" href="/support/rate-limits">
+    Prevent abuse and optimize usage
+  </Card>
+
+  <Card title="Troubleshooting" icon="wrench" href="/support/troubleshooting">
+    Common security issues
+  </Card>
+</CardGroup>
+
+## Questions?
+
+Security is an ongoing commitment. If you have questions or concerns:
+
+- **Email:** security@fltr.com
+- **Documentation:** Check other security guides
+- **Support:** Enterprise customers get 24/7 security support
+
+**Last Updated:** January 2025
