@@ -1,0 +1,114 @@
+---
+title: 'Webhooks Overview'
+description: 'Event-driven HTTP notifications for dataset and document changes'
+---
+
+# Webhooks API
+
+Webhooks send real-time HTTP POST requests to your endpoint when events occur in FLTR.
+
+<Info>
+**Coming Soon**: Webhooks are currently in design phase. [Join the beta](mailto:support@fltr.com) for early access.
+</Info>
+
+## Available Events
+
+- `document.uploaded` - Document upload started
+- `document.processed` - Document indexing complete
+- `document.deleted` - Document removed
+- `document.processing_failed` - Processing error
+- `dataset.created` - New dataset created
+- `dataset.updated` - Dataset metadata changed
+- `dataset.deleted` - Dataset removed
+
+See [Event Schemas](/api-reference/webhooks/events) for detailed payload structures.
+
+## Create Webhook
+
+```bash
+POST /v1/webhooks
+```
+
+### Request
+
+```json
+{
+  "url": "https://your-app.com/webhooks/fltr",
+  "events": ["document.processed", "document.processing_failed"],
+  "description": "Production webhook",
+  "active": true
+}
+```
+
+### Response
+
+```json
+{
+  "webhook_id": "wh_abc123",
+  "url": "https://your-app.com/webhooks/fltr",
+  "events": ["document.processed", "document.processing_failed"],
+  "secret": "whsec_xyz789...",
+  "created_at": "2024-01-10T12:00:00Z",
+  "active": true
+}
+```
+
+## List Webhooks
+
+```bash
+GET /v1/webhooks
+```
+
+Returns all webhooks for your account.
+
+## Update Webhook
+
+```bash
+PATCH /v1/webhooks/{webhook_id}
+```
+
+Update URL, events, or active status.
+
+## Delete Webhook
+
+```bash
+DELETE /v1/webhooks/{webhook_id}
+```
+
+Permanently delete a webhook.
+
+## Security
+
+All webhooks are signed with HMAC-SHA256. See [Security Guide](/api-reference/webhooks/security) for verification details.
+
+## Retry Logic
+
+- **Attempts**: 3 retries on failure
+- **Backoff**: Exponential (1min, 5min, 30min)
+- **Timeout**: 5 seconds per attempt
+
+## Limits
+
+- Max 100 webhooks per account
+- Max 1,000 deliveries per hour per webhook
+- Auto-disable if >80% failure rate
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Event Schemas" icon="code" href="/api-reference/webhooks/events">
+    Detailed event payloads
+  </Card>
+
+  <Card title="Security" icon="lock" href="/api-reference/webhooks/security">
+    Signature verification
+  </Card>
+
+  <Card title="Integration Guide" icon="book" href="/integrations/webhooks">
+    Complete implementation guide
+  </Card>
+
+  <Card title="Join Beta" icon="flask" href="mailto:support@fltr.com">
+    Get early access
+  </Card>
+</CardGroup>

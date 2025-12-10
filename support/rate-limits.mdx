@@ -1,0 +1,366 @@
+---
+title: 'Rate Limits'
+description: 'Understanding and working with FLTR rate limits'
+---
+
+# Rate Limits
+
+FLTR uses rate limiting to ensure fair usage and system stability.
+
+## Overview
+
+Rate limits are enforced per account based on authentication method:
+
+| Authentication | Rate Limit | Reset Period |
+|----------------|------------|--------------|
+| **Anonymous** | 50 requests | 1 hour |
+| **API Key** | 1,000 requests | 1 hour |
+| **OAuth/Session** | 15,000 requests | 1 hour |
+
+## Rate Limit Headers
+
+Every API response includes rate limit information:
+
+```
+X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 847
+X-RateLimit-Reset: 1704657600
+```
+
+<ParamField header="X-RateLimit-Limit" type="integer">
+  Total requests allowed per hour
+</ParamField>
+
+<ParamField header="X-RateLimit-Remaining" type="integer">
+  Requests remaining in current window
+</ParamField>
+
+<ParamField header="X-RateLimit-Reset" type="integer">
+  Unix timestamp when limit resets
+</ParamField>
+
+## Check Your Usage
+
+```python
+response = requests.get(
+    "https://api.fltr.com/v1/datasets",
+    headers={"Authorization": "Bearer YOUR_API_KEY"}
+)
+
+print(f"Limit: {response.headers['X-RateLimit-Limit']}")
+print(f"Remaining: {response.headers['X-RateLimit-Remaining']}")
+print(f"Resets at: {response.headers['X-RateLimit-Reset']}")
+```
+
+## When Rate Limited
+
+If you exceed your limit, you'll receive a 429 status code:
+
+```json
+{
+  "error": "Rate limit exceeded",
+  "code": "rate_limit_exceeded",
+  "retry_after": 3600
+}
+```
+
+The `retry_after` field indicates seconds until you can retry.
+
+## Best Practices
+
+### 1. Implement Exponential Backoff
+
+```python
+import time
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10)
+)
+def make_request():
+    response = requests.post(url, headers=headers, json=data)
+
+    if response.status_code == 429:
+        retry_after = int(response.headers.get('Retry-After', 60))
+        time.sleep(retry_after)
+        raise Exception("Rate limited")
+
+    response.raise_for_status()
+    return response.json()
+```
+
+### 2. Cache Frequent Queries
+
+```python
+from functools import lru_cache
+import hashlib
+
+@lru_cache(maxsize=100)
+def cached_query(query_hash):
+    return query_dataset(query)
+
+# Use hash for cache key
+query_hash = hashlib.md5(query.encode()).hexdigest()
+results = cached_query(query_hash)
+```
+
+### 3. Use Batch Endpoints
+
+```python
+# ❌ Multiple requests
+for query in queries:
+    results.append(query_dataset(query))  # 10 requests
+
+# ✅ Single batch request
+results = batch_query_dataset(queries)  # 1 request
+```
+
+### 4. Monitor Usage
+
+Track your usage to avoid hitting limits:
+
+```python
+import time
+
+class RateLimitTracker:
+    def __init__(self):
+        self.requests = []
+
+    def track_request(self, response):
+        limit = int(response.headers['X-RateLimit-Limit'])
+        remaining = int(response.headers['X-RateLimit-Remaining'])
+        reset = int(response.headers['X-RateLimit-Reset'])
+
+        usage_pct = ((limit - remaining) / limit) * 100
+
+        if usage_pct > 80:
+            print(f"⚠️ Warning: {usage_pct:.0f}% of rate limit used")
+
+        if remaining == 0:
+            wait_time = reset - int(time.time())
+            print(f"⛔ Rate limited. Waiting {wait_time}s")
+            time.sleep(wait_time)
+
+tracker = RateLimitTracker()
+
+response = requests.get(url, headers=headers)
+tracker.track_request(response)
+```
+
+### 5. Spread Requests
+
+Instead of bursting requests, spread them out:
+
+```python
+import time
+
+for item in items:
+    make_request(item)
+    time.sleep(1)  # 1 second delay between requests
+```
+
+## Increase Your Limits
+
+### Upgrade to OAuth
+
+OAuth authentication provides 15x higher limits:
+
+- API Key: 1,000 requests/hour
+- OAuth: **15,000 requests/hour**
+
+<Card title="OAuth Setup" icon="shield" href="/authentication/oauth">
+  Upgrade to OAuth for higher limits →
+</Card>
+
+### Enterprise Plans
+
+Need even higher limits? Contact sales for:
+
+- Custom rate limits
+- Dedicated infrastructure
+- SLA guarantees
+- Priority support
+
+<Card title="Contact Sales" icon="envelope" href="mailto:sales@fltr.com">
+  Discuss enterprise pricing →
+</Card>
+
+## Rate Limit Scope
+
+### Per Account
+
+Rate limits are **per account**, not per API key.
+
+```python
+# These share the same 1,000/hour limit
+api_key_1 = "fltr_sk_abc123..."
+api_key_2 = "fltr_sk_def456..."
+```
+
+Creating multiple API keys does **not** increase your limit.
+
+### Per Hour
+
+Limits reset every hour on a rolling basis:
+
+```
+12:00 - 13:00: 1,000 requests
+13:00 - 14:00: 1,000 requests (limit resets)
+```
+
+### Separate Limits
+
+Each service has independent limits:
+
+- FLTR API: 1,000/hour
+- Webhooks: Unlimited (deliveries don't count)
+
+## Endpoint-Specific Limits
+
+Some endpoints have additional constraints:
+
+| Endpoint | Additional Limit |
+|----------|-----------------|
+| **Batch Query** | Max 10 queries per request |
+| **Upload** | Max 10MB per file |
+| **List** | Max 100 items per page |
+
+## Fair Use Policy
+
+While there are technical rate limits, we also have a fair use policy:
+
+**Allowed:**
+- Production applications
+- Automated workflows
+- Integration services
+- Testing and development
+
+**Not Allowed:**
+- Excessive scraping
+- DoS attacks
+- Reselling API access
+- Violating ToS
+
+Accounts violating fair use may be suspended.
+
+## Monitoring in Production
+
+### Log Rate Limit Metrics
+
+```python
+import logging
+
+def log_rate_limit(response):
+    logging.info({
+        'rate_limit': response.headers['X-RateLimit-Limit'],
+        'remaining': response.headers['X-RateLimit-Remaining'],
+        'reset_at': response.headers['X-RateLimit-Reset'],
+        'timestamp': time.time()
+    })
+```
+
+### Alert on High Usage
+
+```python
+def check_rate_limit(response):
+    remaining = int(response.headers['X-RateLimit-Remaining'])
+    limit = int(response.headers['X-RateLimit-Limit'])
+
+    if remaining < limit * 0.1:  # Less than 10% remaining
+        send_alert(f"Rate limit warning: {remaining}/{limit}")
+```
+
+### Dashboard Metrics
+
+Track over time:
+
+- Requests per hour
+- Peak usage times
+- Rate limit hit frequency
+- Average remaining quota
+
+## Testing Rate Limits
+
+### Simulate Rate Limiting
+
+```python
+def rate_limited_request():
+    """Test app behavior when rate limited"""
+    class MockResponse:
+        status_code = 429
+        headers = {'Retry-After': '60'}
+        def json(self):
+            return {
+                'error': 'Rate limit exceeded',
+                'retry_after': 60
+            }
+
+    return MockResponse()
+
+# Test your error handling
+response = rate_limited_request()
+handle_rate_limit(response)
+```
+
+### Load Testing
+
+Test your implementation:
+
+```python
+import concurrent.futures
+
+def load_test():
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        futures = [executor.submit(make_request) for _ in range(100)]
+
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                result = future.result()
+            except Exception as e:
+                print(f"Error: {e}")
+
+load_test()
+```
+
+## FAQ
+
+**Q: Can I request a temporary limit increase?**
+
+A: Yes, contact support@fltr.com with your use case.
+
+**Q: Do failed requests count toward the limit?**
+
+A: Yes, all requests count including 4xx and 5xx errors.
+
+**Q: Does listing datasets use the same limit as queries?**
+
+A: Yes, all API endpoints share the same rate limit.
+
+**Q: Can I purchase additional requests?**
+
+A: We offer enterprise plans with custom limits. Contact sales.
+
+**Q: How long are limits enforced after exceeding them?**
+
+A: Limits reset hourly on a rolling basis.
+
+## Resources
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/authentication/overview">
+    Upgrade for higher limits
+  </Card>
+
+  <Card title="Batch Query" icon="layer-group" href="/api-reference/mcp/batch-query">
+    Reduce requests with batching
+  </Card>
+
+  <Card title="Caching Guide" icon="database" href="/guides/caching">
+    Implement request caching
+  </Card>
+
+  <Card title="Contact Support" icon="envelope" href="mailto:support@fltr.com">
+    Need help with limits?
+  </Card>
+</CardGroup>

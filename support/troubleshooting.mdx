@@ -1,0 +1,419 @@
+---
+title: 'Troubleshooting'
+description: 'Common issues and solutions'
+---
+
+# Troubleshooting Guide
+
+Quick solutions to common FLTR issues.
+
+## Authentication Issues
+
+### 401 Unauthorized
+
+**Error:**
+```json
+{"error": "Invalid API key", "code": "invalid_api_key"}
+```
+
+**Causes:**
+- Wrong API key
+- Missing "Bearer" prefix
+- Key has been revoked
+- Extra whitespace in header
+
+**Solutions:**
+
+```bash
+# ✅ Correct
+Authorization: Bearer fltr_sk_abc123...
+
+# ❌ Wrong - missing Bearer
+Authorization: fltr_sk_abc123...
+
+# ❌ Wrong - extra colon
+Authorization: Bearer: fltr_sk_abc123...
+```
+
+Check your key in [Settings → API Keys](https://app.fltr.com/settings/api-keys).
+
+### 403 Forbidden
+
+**Error:**
+```json
+{"error": "Insufficient permissions", "code": "insufficient_scope"}
+```
+
+**Causes:**
+- OAuth scope doesn't include required permission
+- Accessing another user's resources
+
+**Solutions:**
+- Check OAuth scopes
+- Verify resource ownership
+- Use correct authentication method
+
+## Search Issues
+
+### No Results Returned
+
+**Causes:**
+- Document still processing
+- No matching content
+- Wrong dataset ID
+- Overly specific filters
+
+**Solutions:**
+
+1. **Wait for processing:**
+   ```bash
+   # Check document status
+   GET /v1/datasets/{dataset_id}/documents/{document_id}
+   ```
+
+2. **Try broader queries:**
+   ```bash
+   # Instead of
+   "query": "exact phrase match"
+
+   # Try
+   "query": "main keywords"
+   ```
+
+3. **Verify dataset:**
+   ```bash
+   GET /v1/datasets/{dataset_id}
+   ```
+
+4. **Remove filters:**
+   ```json
+   {
+     "query": "search term",
+     "dataset_id": "ds_abc123"
+     // Remove filters temporarily
+   }
+   ```
+
+### Low Relevance Scores
+
+**Causes:**
+- Poor quality embeddings
+- Mismatched terminology
+- Short content chunks
+
+**Solutions:**
+
+1. **Enable reranking:**
+   ```json
+   {
+     "query": "search term",
+     "dataset_id": "ds_abc123",
+     "rerank": true  // Improves quality
+   }
+   ```
+
+2. **Add metadata:**
+   ```json
+   {
+     "content": "...",
+     "metadata": {
+       "title": "Descriptive title",
+       "category": "relevant-category",
+       "tags": ["keyword1", "keyword2"]
+     }
+   }
+   ```
+
+3. **Improve chunking:**
+   - Keep related content together
+   - Add context to chunks
+   - Use descriptive titles
+
+## Upload Issues
+
+### 413 Payload Too Large
+
+**Error:**
+```json
+{"error": "Document exceeds maximum size of 10MB"}
+```
+
+**Solutions:**
+
+1. **Split large files:**
+   ```python
+   # Split PDF into sections
+   from PyPDF2 import PdfReader, PdfWriter
+
+   reader = PdfReader('large.pdf')
+   for i in range(0, len(reader.pages), 50):
+       writer = PdfWriter()
+       for page in reader.pages[i:i+50]:
+           writer.add_page(page)
+
+       with open(f'section_{i}.pdf', 'wb') as f:
+           writer.write(f)
+   ```
+
+2. **Compress files:**
+   ```bash
+   # Compress images in PDF
+   gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 \
+      -dPDFSETTINGS=/ebook -dNOPAUSE -dQUIET -dBATCH \
+      -sOutputFile=compressed.pdf input.pdf
+   ```
+
+3. **Extract text first:**
+   ```python
+   # Upload text instead of file
+   with open('large.txt') as f:
+       content = f.read()
+
+   response = requests.post(
+       url,
+       json={"content": content}
+   )
+   ```
+
+### Processing Failed
+
+**Error:**
+```json
+{
+  "event": "document.processing_failed",
+  "data": {
+    "error": {
+      "code": "invalid_pdf",
+      "message": "PDF is encrypted"
+    }
+  }
+}
+```
+
+**Common codes:**
+
+| Code | Cause | Solution |
+|------|-------|----------|
+| `invalid_pdf` | Corrupted/encrypted PDF | Remove encryption, repair file |
+| `extraction_failed` | Can't extract text | Convert to different format |
+| `timeout` | File too large | Split into smaller files |
+| `unsupported_format` | Unknown file type | Use supported formats |
+
+**Solutions:**
+
+1. **Remove PDF encryption:**
+   ```bash
+   qpdf --decrypt input.pdf output.pdf
+   ```
+
+2. **Convert format:**
+   ```bash
+   # DOCX to PDF
+   libreoffice --headless --convert-to pdf document.docx
+
+   # Image to text (OCR)
+   tesseract image.png output -l eng
+   ```
+
+3. **Repair corrupted PDF:**
+   Use online tools or `pdftk`:
+   ```bash
+   pdftk broken.pdf output fixed.pdf
+   ```
+
+## Rate Limit Issues
+
+### 429 Too Many Requests
+
+**Error:**
+```json
+{
+  "error": "Rate limit exceeded",
+  "code": "rate_limit_exceeded",
+  "retry_after": 3600
+}
+```
+
+**Solutions:**
+
+1. **Implement backoff:**
+   ```python
+   import time
+
+   def make_request():
+       response = requests.post(url, headers=headers, json=data)
+
+       if response.status_code == 429:
+           retry_after = int(response.headers.get('Retry-After', 60))
+           time.sleep(retry_after)
+           return make_request()  # Retry
+
+       return response
+   ```
+
+2. **Use batch endpoints:**
+   ```python
+   # Instead of
+   for query in queries:
+       results.append(query_dataset(query))  # Multiple requests
+
+   # Use
+   results = batch_query_dataset(queries)  # Single request
+   ```
+
+3. **Cache results:**
+   ```python
+   from functools import lru_cache
+
+   @lru_cache(maxsize=100)
+   def cached_query(query):
+       return query_dataset(query)
+   ```
+
+4. **Upgrade authentication:**
+   - API Key: 1,000/hour
+   - OAuth: 15,000/hour (15x more!)
+
+## Network Issues
+
+### Connection Timeout
+
+**Causes:**
+- Network connectivity issues
+- Firewall blocking requests
+- DNS resolution failure
+
+**Solutions:**
+
+1. **Check connectivity:**
+   ```bash
+   # Test API is reachable
+   curl -I https://api.fltr.com/v1/datasets
+
+   # Check DNS
+   nslookup api.fltr.com
+   ```
+
+2. **Increase timeout:**
+   ```python
+   response = requests.post(
+       url,
+       headers=headers,
+       json=data,
+       timeout=30  # 30 second timeout
+   )
+   ```
+
+3. **Check firewall:**
+   - Allow outbound HTTPS (port 443)
+   - Whitelist `api.fltr.com`
+
+### SSL/TLS Errors
+
+**Error:**
+```
+SSLError: [SSL: CERTIFICATE_VERIFY_FAILED]
+```
+
+**Solutions:**
+
+1. **Update CA certificates:**
+   ```bash
+   # macOS
+   pip install --upgrade certifi
+
+   # Ubuntu
+   sudo apt-get update && sudo apt-get install --reinstall ca-certificates
+   ```
+
+2. **Verify TLS version:**
+   ```python
+   import ssl
+   print(ssl.OPENSSL_VERSION)  # Should be 1.1.1 or higher
+   ```
+
+## Integration Issues
+
+### Zapier Not Receiving Data
+
+**Causes:**
+- Wrong field paths
+- Response not parsed
+- Timeout
+
+**Solutions:**
+
+1. **Check raw output:**
+   - Click on Zapier step
+   - View "Raw Output" tab
+   - Verify data structure
+
+2. **Use correct paths:**
+   ```
+   # Not this
+   results.0.content
+
+   # Use this (double underscore)
+   results__0__content
+   ```
+
+3. **Test webhook:**
+   - Send test request
+   - Check Zapier task history
+   - Verify headers
+
+### Make.com Mapping Issues
+
+**Causes:**
+- Array iteration problem
+- Missing data
+
+**Solutions:**
+
+1. **Use Iterator:**
+   - Add Iterator module
+   - Connect to `{{http.data.results}}`
+   - Process each result
+
+2. **Map correctly:**
+   ```
+   {{map(2.data.results; "content")}}
+   {{2.data.results[1].metadata.title}}
+   ```
+
+## Getting Help
+
+If you're still stuck:
+
+<CardGroup cols={2}>
+  <Card title="Email Support" icon="envelope" href="mailto:support@fltr.com">
+    support@fltr.com
+  </Card>
+
+  <Card title="Check Status" icon="signal" href="https://status.fltr.com">
+    See if there's an outage
+  </Card>
+
+  <Card title="Documentation" icon="book" href="/introduction">
+    Browse complete docs
+  </Card>
+
+  <Card title="GitHub Issues" icon="github" href="https://github.com/fltr/issues">
+    Report bugs or request features
+  </Card>
+</CardGroup>
+
+## Debug Checklist
+
+When troubleshooting:
+
+- [ ] Check API status at [status.fltr.com](https://status.fltr.com)
+- [ ] Verify API key is correct and active
+- [ ] Check rate limit headers
+- [ ] Review error message and code
+- [ ] Test with cURL to isolate issue
+- [ ] Check request/response logs
+- [ ] Verify dataset/document IDs exist
+- [ ] Try simple request first
+- [ ] Check for network/firewall issues
+- [ ] Review recent code changes

@@ -1,0 +1,317 @@
+---
+title: 'FAQ'
+description: 'Frequently asked questions about FLTR'
+---
+
+# Frequently Asked Questions
+
+Common questions and answers about using FLTR.
+
+## General
+
+<AccordionGroup>
+  <Accordion title="What is FLTR?">
+    FLTR is a Context as a Service platform that makes your documents AI-ready. It provides semantic search over your content using hybrid vector + keyword search, accessible via REST API or Model Context Protocol (MCP).
+  </Accordion>
+
+  <Accordion title="Who is FLTR for?">
+    FLTR serves three main audiences:
+
+    - **AI Developers** - Building RAG applications, knowledge bases, and AI agents
+    - **No-Code Builders** - Integrating with Zapier, Make, n8n
+    - **Enterprises** - Team collaboration with advanced security
+
+  </Accordion>
+
+  <Accordion title="How does FLTR differ from other search solutions?">
+    FLTR combines:
+
+    - **Hybrid search** - Vector similarity + keyword matching
+    - **MCP-native** - Built for Claude Desktop, VS Code, Cursor
+    - **Simple API** - RESTful with comprehensive docs
+    - **Multimodal** - PDFs, images, text, code
+
+  </Accordion>
+
+  <Accordion title="Is FLTR open source?">
+    The FLTR API is proprietary, but we provide:
+
+    - Open API specification (OpenAPI 3.1)
+    - Public documentation
+    - Example integrations on GitHub
+    - MCP server implementations
+
+  </Accordion>
+</AccordionGroup>
+
+## Pricing & Billing
+
+<AccordionGroup>
+  <Accordion title="Is there a free tier?">
+    Yes! Free tier includes:
+
+    - 50 requests/hour (anonymous)
+    - 2 datasets
+    - 100 documents
+    - 1GB storage
+
+    Paid plans start at $29/month.
+  </Accordion>
+
+  <Accordion title="How does billing work?">
+    Billing is credit-based:
+
+    - **Queries**: 1 credit per query
+    - **Uploads**: 10 credits per document
+    - **Storage**: 1 credit per GB per month
+    - **Reranking**: +2 credits per query
+
+    Plans include monthly credit allocations.
+  </Accordion>
+
+  <Accordion title="Can I upgrade or downgrade my plan?">
+    Yes, anytime. Changes take effect immediately with prorated billing.
+  </Accordion>
+
+  <Accordion title="What payment methods do you accept?">
+    We accept:
+
+    - Credit/debit cards (Stripe)
+    - ACH (US only)
+    - Wire transfer (Enterprise)
+    - Annual prepayment (10% discount)
+
+  </Accordion>
+</AccordionGroup>
+
+## Technical
+
+<AccordionGroup>
+  <Accordion title="What file types are supported?">
+    We support:
+
+    - **Documents**: PDF, DOCX, PPTX, TXT, MD
+    - **Images**: JPG, PNG (with OCR)
+    - **Code**: PY, JS, JAVA, etc.
+    - **Data**: JSON, XML, CSV, YAML
+
+    Max file size: 10MB
+  </Accordion>
+
+  <Accordion title="How long does document processing take?">
+    Processing time depends on file size:
+
+    - **Text (< 1MB)**: 1-5 seconds
+    - **PDFs (1-5MB)**: 5-15 seconds
+    - **Large PDFs (5-10MB)**: 15-30 seconds
+    - **Images**: +5-10 seconds for OCR
+
+  </Accordion>
+
+  <Accordion title="What embedding model do you use?">
+    Default: `text-embedding-3-small` (OpenAI)
+
+    Coming soon:
+    - `text-embedding-3-large`
+    - Custom models (Enterprise)
+    - Multilingual models
+
+  </Accordion>
+
+  <Accordion title="Can I use my own embedding model?">
+    Not yet. Custom embedding models are planned for Enterprise plans. [Contact sales](mailto:sales@fltr.com) to discuss.
+  </Accordion>
+
+  <Accordion title="How accurate is the search?">
+    Hybrid search provides:
+
+    - **Precision**: 85-95% for exact matches
+    - **Recall**: 80-90% for semantic queries
+    - **With reranking**: +5-10% improvement
+
+    Accuracy depends on document quality and metadata.
+  </Accordion>
+
+  <Accordion title="Can I search across multiple datasets?">
+    Not directly. You need to query each dataset separately. Use batch queries to search multiple datasets efficiently.
+
+    Multi-dataset search is planned for Q2 2024.
+  </Accordion>
+</AccordionGroup>
+
+## Security & Privacy
+
+<AccordionGroup>
+  <Accordion title="Is my data secure?">
+    Yes. FLTR implements:
+
+    - **Encryption**: TLS 1.3 in transit, AES-256 at rest
+    - **Isolation**: Data separated by account
+    - **Access control**: Role-based permissions
+    - **Compliance**: SOC 2 Type II (in progress)
+
+  </Accordion>
+
+  <Accordion title="Who can access my documents?">
+    Only you and users you grant access to. FLTR staff cannot access your documents unless you explicitly grant support access for troubleshooting.
+  </Accordion>
+
+  <Accordion title="Where is data stored?">
+    Data is stored in:
+
+    - **US East (primary)**: us-east-1 (AWS)
+    - **EU (optional)**: eu-west-1 (AWS)
+
+    Enterprise plans can choose region.
+  </Accordion>
+
+  <Accordion title="Do you train AI models on my data?">
+    **No.** Your data is never used for:
+
+    - Model training
+    - Research
+    - Analytics (except aggregated usage stats)
+    - Any purpose outside your use case
+
+  </Accordion>
+
+  <Accordion title="Can I delete my data?">
+    Yes. You can:
+
+    - Delete documents anytime
+    - Delete datasets (removes all documents)
+    - Delete account (removes all data within 30 days)
+
+    Backups are retained for 30 days, then permanently deleted.
+  </Accordion>
+
+  <Accordion title="Are you GDPR compliant?">
+    Yes. FLTR is GDPR compliant with:
+
+    - Data processing agreements
+    - Right to deletion
+    - Data portability
+    - Privacy by design
+
+  </Accordion>
+</AccordionGroup>
+
+## Integration
+
+<AccordionGroup>
+  <Accordion title="How do I integrate FLTR with my app?">
+    Three ways:
+
+    1. **REST API** - For any language
+    2. **MCP** - For Claude Desktop, VS Code, Cursor
+    3. **No-code** - Zapier, Make, n8n
+
+    See [Getting Started](/quickstart/getting-started).
+  </Accordion>
+
+  <Accordion title="Is there a Python SDK?">
+    Not yet. We're working on official SDKs for:
+
+    - Python
+    - JavaScript/TypeScript
+    - Go
+
+    ETA: Q1 2024. For now, use the REST API.
+  </Accordion>
+
+  <Accordion title="Can I use FLTR with Claude Desktop?">
+    Yes! FLTR has native MCP support for Claude Desktop.
+
+    See [OAuth Setup](/authentication/oauth) for configuration.
+  </Accordion>
+
+  <Accordion title="Does FLTR work with LangChain?">
+    Yes, use FLTR as a retriever in LangChain:
+
+    ```python
+    from langchain.retrievers import FLTRRetriever
+
+    retriever = FLTRRetriever(
+        api_key="your_key",
+        dataset_id="ds_abc123"
+    )
+    ```
+
+    See our [LangChain integration guide](/integrations/langchain).
+  </Accordion>
+
+  <Accordion title="Can I self-host FLTR?">
+    No. FLTR is a managed service only.
+
+    Enterprise plans include:
+    - Dedicated infrastructure
+    - Custom domains
+    - VPC peering
+
+  </Accordion>
+</AccordionGroup>
+
+## Support
+
+<AccordionGroup>
+  <Accordion title="What support do you offer?">
+    Support varies by plan:
+
+    - **Free**: Email support (48h response)
+    - **Pro**: Email + chat (24h response)
+    - **Enterprise**: Priority support + Slack (4h response)
+
+  </Accordion>
+
+  <Accordion title="Do you have a status page?">
+    Yes: [status.fltr.com](https://status.fltr.com)
+
+    Subscribe to:
+    - Email notifications
+    - SMS alerts
+    - Slack integration
+
+  </Accordion>
+
+  <Accordion title="How do I report a bug?">
+    Report bugs via:
+
+    - Email: [support@fltr.com](mailto:support@fltr.com)
+    - GitHub: [github.com/fltr/issues](https://github.com/fltr/issues)
+
+    Include:
+    - Steps to reproduce
+    - Expected vs actual behavior
+    - Request/response examples
+
+  </Accordion>
+
+  <Accordion title="Can I request features?">
+    Yes! We love feedback. Request features:
+
+    - Email: [support@fltr.com](mailto:support@fltr.com)
+    - GitHub: [github.com/fltr/issues](https://github.com/fltr/issues)
+
+    We prioritize based on user demand.
+  </Accordion>
+</AccordionGroup>
+
+## Still Have Questions?
+
+<CardGroup cols={2}>
+  <Card title="Email Support" icon="envelope" href="mailto:support@fltr.com">
+    support@fltr.com
+  </Card>
+
+  <Card title="Documentation" icon="book" href="/introduction">
+    Browse complete docs
+  </Card>
+
+  <Card title="Schedule Demo" icon="calendar" href="https://cal.com/fltr/demo">
+    Book a 30-minute demo
+  </Card>
+
+  <Card title="Join Discord" icon="discord" href="https://discord.gg/fltr">
+    Chat with the community
+  </Card>
+</CardGroup>

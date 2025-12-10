@@ -1,0 +1,146 @@
+---
+title: 'Webhook Events'
+description: 'Complete reference for all webhook event payloads'
+---
+
+# Webhook Event Schemas
+
+All webhook events follow this structure:
+
+```json
+{
+  "event": "event.name",
+  "timestamp": "2024-01-10T12:00:00Z",
+  "data": { /* event-specific data */ }
+}
+```
+
+## document.uploaded
+
+Fired when document upload completes.
+
+```json
+{
+  "event": "document.uploaded",
+  "timestamp": "2024-01-10T12:00:00Z",
+  "data": {
+    "document_id": "doc_abc123",
+    "dataset_id": "ds_xyz789",
+    "filename": "product-docs.pdf",
+    "size_bytes": 1048576,
+    "status": "processing",
+    "metadata": {
+      "title": "Product Documentation",
+      "category": "docs"
+    }
+  }
+}
+```
+
+## document.processed
+
+Fired when indexing completes successfully.
+
+```json
+{
+  "event": "document.processed",
+  "timestamp": "2024-01-10T12:01:30Z",
+  "data": {
+    "document_id": "doc_abc123",
+    "dataset_id": "ds_xyz789",
+    "chunks_created": 47,
+    "processing_time_ms": 8450,
+    "status": "ready",
+    "embedding_model": "text-embedding-3-small"
+  }
+}
+```
+
+## document.processing_failed
+
+Fired when processing encounters an error.
+
+```json
+{
+  "event": "document.processing_failed",
+  "timestamp": "2024-01-10T12:02:00Z",
+  "data": {
+    "document_id": "doc_abc123",
+    "dataset_id": "ds_xyz789",
+    "error": {
+      "code": "invalid_pdf",
+      "message": "PDF file is corrupted or encrypted",
+      "details": "Unable to extract text from PDF"
+    }
+  }
+}
+```
+
+## document.deleted
+
+Fired when document is deleted.
+
+```json
+{
+  "event": "document.deleted",
+  "timestamp": "2024-01-10T12:05:00Z",
+  "data": {
+    "document_id": "doc_abc123",
+    "dataset_id": "ds_xyz789",
+    "deleted_by": "user_xyz123"
+  }
+}
+```
+
+## dataset.created
+
+Fired when dataset is created.
+
+```json
+{
+  "event": "dataset.created",
+  "timestamp": "2024-01-10T11:00:00Z",
+  "data": {
+    "dataset_id": "ds_xyz789",
+    "name": "Product Knowledge Base",
+    "description": "All product docs",
+    "is_public": false,
+    "created_by": "user_xyz123"
+  }
+}
+```
+
+## dataset.updated
+
+Fired when dataset metadata changes.
+
+```json
+{
+  "event": "dataset.updated",
+  "timestamp": "2024-01-10T12:10:00Z",
+  "data": {
+    "dataset_id": "ds_xyz789",
+    "changes": {
+      "name": "Updated Product KB",
+      "description": "All product documentation"
+    },
+    "updated_by": "user_xyz123"
+  }
+}
+```
+
+## dataset.deleted
+
+Fired when dataset is deleted.
+
+```json
+{
+  "event": "dataset.deleted",
+  "timestamp": "2024-01-10T13:00:00Z",
+  "data": {
+    "dataset_id": "ds_xyz789",
+    "document_count": 42,
+    "deleted_by": "user_xyz123"
+  }
+}
+```
