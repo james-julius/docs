@@ -45,8 +45,7 @@ docs/
 │   ├── webhooks.mdx
 │   └── langchain.mdx
 ├── guides/                # Best practices
-│   ├── rag-best-practices.mdx
-│   └── caching.mdx
+│   └── rag-best-practices.mdx
 ├── api-reference/         # API documentation
 │   ├── introduction.mdx
 │   ├── datasets/
