@@ -35,7 +35,7 @@ export TEST_DATASET_ID="ds_..."
 **Test Case 1.1.1: Basic Query**
 ```bash
 # Expected: 200 OK with results
-curl -X GET "${FLTR_API_URL}/mcp/query/${TEST_DATASET_ID}/test-endpoint?query=test&limit=5" \
+curl -X GET "${FLTR_API_URL}/mcp/query?datasetId=${TEST_DATASET_ID}&query=test&limit=5" \
   -H "Authorization: Bearer ${FLTR_API_KEY}" \
   -H "Content-Type: application/json"
 
@@ -49,7 +49,7 @@ curl -X GET "${FLTR_API_URL}/mcp/query/${TEST_DATASET_ID}/test-endpoint?query=te
 **Test Case 1.1.2: Query with Reranking**
 ```bash
 # Expected: 200 OK with reranked results
-curl -X GET "${FLTR_API_URL}/mcp/query/${TEST_DATASET_ID}/test-endpoint?query=test&limit=5&enable_reranking=true&rerank_top_k=15" \
+curl -X GET "${FLTR_API_URL}/mcp/query?datasetId=${TEST_DATASET_ID}&query=test&limit=5&enable_reranking=true&rerank_top_k=15" \
   -H "Authorization: Bearer ${FLTR_API_KEY}"
 
 # Verify:
@@ -61,15 +61,15 @@ curl -X GET "${FLTR_API_URL}/mcp/query/${TEST_DATASET_ID}/test-endpoint?query=te
 **Test Case 1.1.3: Search Mode Variations**
 ```bash
 # Test vector search
-curl -X GET "${FLTR_API_URL}/mcp/query/${TEST_DATASET_ID}/test-endpoint?query=test&search_mode=vector" \
+curl -X GET "${FLTR_API_URL}/mcp/query?datasetId=${TEST_DATASET_ID}&query=test&search_mode=vector" \
   -H "Authorization: Bearer ${FLTR_API_KEY}"
 
 # Test keyword search
-curl -X GET "${FLTR_API_URL}/mcp/query/${TEST_DATASET_ID}/test-endpoint?query=test&search_mode=keyword" \
+curl -X GET "${FLTR_API_URL}/mcp/query?datasetId=${TEST_DATASET_ID}&query=test&search_mode=keyword" \
   -H "Authorization: Bearer ${FLTR_API_KEY}"
 
 # Test hybrid search
-curl -X GET "${FLTR_API_URL}/mcp/query/${TEST_DATASET_ID}/test-endpoint?query=test&search_mode=hybrid" \
+curl -X GET "${FLTR_API_URL}/mcp/query?datasetId=${TEST_DATASET_ID}&query=test&search_mode=hybrid" \
   -H "Authorization: Bearer ${FLTR_API_KEY}"
 
 # Verify:
@@ -81,17 +81,17 @@ curl -X GET "${FLTR_API_URL}/mcp/query/${TEST_DATASET_ID}/test-endpoint?query=te
 **Test Case 1.1.4: Invalid Parameters**
 ```bash
 # Test invalid limit (too high)
-curl -X GET "${FLTR_API_URL}/mcp/query/${TEST_DATASET_ID}/test-endpoint?query=test&limit=100" \
+curl -X GET "${FLTR_API_URL}/mcp/query?datasetId=${TEST_DATASET_ID}&query=test&limit=100" \
   -H "Authorization: Bearer ${FLTR_API_KEY}"
 # Expected: 422 validation error
 
 # Test invalid search_mode
-curl -X GET "${FLTR_API_URL}/mcp/query/${TEST_DATASET_ID}/test-endpoint?query=test&search_mode=invalid" \
+curl -X GET "${FLTR_API_URL}/mcp/query?datasetId=${TEST_DATASET_ID}&query=test&search_mode=invalid" \
   -H "Authorization: Bearer ${FLTR_API_KEY}"
 # Expected: Defaults to hybrid, returns 200
 
 # Test missing query parameter
-curl -X GET "${FLTR_API_URL}/mcp/query/${TEST_DATASET_ID}/test-endpoint?limit=5" \
+curl -X GET "${FLTR_API_URL}/mcp/query?datasetId=${TEST_DATASET_ID}&limit=5" \
   -H "Authorization: Bearer ${FLTR_API_KEY}"
 # Expected: 422 validation error
 ```
@@ -270,7 +270,7 @@ curl -X GET "${FLTR_API_URL}/mcp/datasets" \
 
 **Test Case 2.3.1: Access Own Private Dataset**
 ```bash
-curl -X GET "${FLTR_API_URL}/mcp/query/${PRIVATE_DATASET_ID}/test?query=test" \
+curl -X GET "${FLTR_API_URL}/mcp/query?datasetId=${PRIVATE_DATASET_ID}&query=test" \
   -H "Authorization: Bearer ${FLTR_API_KEY}"
 
 # Verify:
@@ -281,7 +281,7 @@ curl -X GET "${FLTR_API_URL}/mcp/query/${PRIVATE_DATASET_ID}/test?query=test" \
 **Test Case 2.3.2: Access Others' Private Dataset**
 ```bash
 # Use different user's API key
-curl -X GET "${FLTR_API_URL}/mcp/query/${PRIVATE_DATASET_ID}/test?query=test" \
+curl -X GET "${FLTR_API_URL}/mcp/query?datasetId=${PRIVATE_DATASET_ID}&query=test" \
   -H "Authorization: Bearer ${OTHER_USER_API_KEY}"
 
 # Verify:
@@ -421,7 +421,7 @@ CREDITS_BEFORE=$(curl -X GET "${FLTR_API_URL}/credits" \
   -H "Authorization: Bearer ${FLTR_API_KEY}" | jq '.balance')
 
 # Run query
-curl -X GET "${FLTR_API_URL}/mcp/query/${TEST_DATASET_ID}/test?query=test&search_mode=vector" \
+curl -X GET "${FLTR_API_URL}/mcp/query?datasetId=${TEST_DATASET_ID}&query=test&search_mode=vector" \
   -H "Authorization: Bearer ${FLTR_API_KEY}"
 
 # Check user credits after
@@ -439,7 +439,7 @@ CREDITS_BEFORE=$(curl -X GET "${FLTR_API_URL}/credits" \
   -H "Authorization: Bearer ${FLTR_API_KEY}" | jq '.balance')
 
 # Run hybrid query
-curl -X GET "${FLTR_API_URL}/mcp/query/${TEST_DATASET_ID}/test?query=test&search_mode=hybrid" \
+curl -X GET "${FLTR_API_URL}/mcp/query?datasetId=${TEST_DATASET_ID}&query=test&search_mode=hybrid" \
   -H "Authorization: Bearer ${FLTR_API_KEY}"
 
 # Check credits after
@@ -485,7 +485,7 @@ CREDITS_AFTER=$(curl -X GET "${FLTR_API_URL}/credits" \
 # Drain credits to 0 (admin can set balance)
 # OR use test API key with 0 balance
 
-curl -X GET "${FLTR_API_URL}/mcp/query/${TEST_DATASET_ID}/test?query=test" \
+curl -X GET "${FLTR_API_URL}/mcp/query?datasetId=${TEST_DATASET_ID}&query=test" \
   -H "Authorization: Bearer ${ZERO_CREDIT_API_KEY}"
 
 # Verify:
@@ -510,7 +510,7 @@ curl -X GET "${FLTR_API_URL}/mcp/query/${TEST_DATASET_ID}/test?query=test" \
 **Test Case 4.4.1: Admin User Bypasses Credits**
 ```bash
 # Use admin API key
-curl -X GET "${FLTR_API_URL}/mcp/query/${TEST_DATASET_ID}/test?query=test" \
+curl -X GET "${FLTR_API_URL}/mcp/query?datasetId=${TEST_DATASET_ID}&query=test" \
   -H "Authorization: Bearer ${ADMIN_API_KEY}"
 
 # Verify:
@@ -670,7 +670,7 @@ curl -X POST https://your-n8n.com/webhook/fltr-search \
 
 **Test Case 6.1.1: 400 Bad Request**
 ```bash
-curl -X GET "${FLTR_API_URL}/mcp/query/${TEST_DATASET_ID}/test?limit=999" \
+curl -X GET "${FLTR_API_URL}/mcp/query?datasetId=${TEST_DATASET_ID}&limit=999" \
   -H "Authorization: Bearer ${FLTR_API_KEY}"
 
 # Verify:
@@ -680,7 +680,7 @@ curl -X GET "${FLTR_API_URL}/mcp/query/${TEST_DATASET_ID}/test?limit=999" \
 
 **Test Case 6.1.2: 401 Unauthorized**
 ```bash
-curl -X GET "${FLTR_API_URL}/mcp/query/${TEST_DATASET_ID}/test?query=test" \
+curl -X GET "${FLTR_API_URL}/mcp/query?datasetId=${TEST_DATASET_ID}&query=test" \
   -H "Authorization: Bearer invalid_key"
 
 # Verify:
@@ -727,7 +727,7 @@ curl -X GET "${FLTR_API_URL}/mcp/query/00000000-0000-0000-0000-000000000000/test
 **Test Case 7.1.1: Query Response Time**
 ```bash
 # Measure response time
-time curl -X GET "${FLTR_API_URL}/mcp/query/${TEST_DATASET_ID}/test?query=test&limit=5" \
+time curl -X GET "${FLTR_API_URL}/mcp/query?datasetId=${TEST_DATASET_ID}&query=test&limit=5" \
   -H "Authorization: Bearer ${FLTR_API_KEY}"
 
 # Verify:
@@ -759,7 +759,7 @@ time curl -X POST "${FLTR_API_URL}/mcp/batch-query" \
 ```bash
 # Send 10 parallel requests
 for i in {1..10}; do
-  curl -X GET "${FLTR_API_URL}/mcp/query/${TEST_DATASET_ID}/test?query=test$i" \
+  curl -X GET "${FLTR_API_URL}/mcp/query?datasetId=${TEST_DATASET_ID}&query=test$i" \
     -H "Authorization: Bearer ${FLTR_API_KEY}" &
 done
 wait
@@ -941,7 +941,7 @@ echo "===================================="
 # Test 1: Basic Query
 echo -e "\n1️⃣  Testing basic query..."
 response=$(curl -s -w "%{http_code}" -o /tmp/response.json \
-  -X GET "${FLTR_API_URL}/mcp/query/${TEST_DATASET_ID}/test?query=test&limit=5" \
+  -X GET "${FLTR_API_URL}/mcp/query?datasetId=${TEST_DATASET_ID}&query=test&limit=5" \
   -H "Authorization: Bearer ${FLTR_API_KEY}")
 
 if [ "$response" = "200" ]; then
