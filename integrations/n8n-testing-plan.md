@@ -416,7 +416,7 @@ curl -i -X GET "${FLTR_API_URL}/mcp/datasets" \
 
 **Test Case 4.1.1: Query Deducts 1 Credit (Vector/Keyword)**
 ```bash
-# Check credits before
+# Check user credits before (API keys draw from user balance, not separate pools)
 CREDITS_BEFORE=$(curl -X GET "${FLTR_API_URL}/credits" \
   -H "Authorization: Bearer ${FLTR_API_KEY}" | jq '.balance')
 
@@ -424,12 +424,12 @@ CREDITS_BEFORE=$(curl -X GET "${FLTR_API_URL}/credits" \
 curl -X GET "${FLTR_API_URL}/mcp/query/${TEST_DATASET_ID}/test?query=test&search_mode=vector" \
   -H "Authorization: Bearer ${FLTR_API_KEY}"
 
-# Check credits after
+# Check user credits after
 CREDITS_AFTER=$(curl -X GET "${FLTR_API_URL}/credits" \
   -H "Authorization: Bearer ${FLTR_API_KEY}" | jq '.balance')
 
 # Verify:
-# ✅ CREDITS_AFTER = CREDITS_BEFORE - 1
+# ✅ CREDITS_AFTER = CREDITS_BEFORE - 1 (deducted from user balance)
 ```
 
 **Test Case 4.1.2: Hybrid Query Deducts 2 Credits**

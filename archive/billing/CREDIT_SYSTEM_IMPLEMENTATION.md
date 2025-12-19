@@ -51,10 +51,11 @@ FastAPI connects to **both databases** - the main database for datasets and the 
    - FastAPI accesses via `AUTH_DATABASE_URL` connection
    - See [DATABASE_ARCHITECTURE.md](DATABASE_ARCHITECTURE.md) for cross-database patterns
 
-2. **API Key Credits**: Dedicated credit pools per API key
-   - Each API key has its own credit balance
-   - Optional daily/monthly rate limits
-   - Tracks team_id for future team billing
+2. **API Key Credits**: ~~Dedicated credit pools per API key~~ **DEPRECATED - December 2024**
+   - **NEW**: API keys now draw from the user's unified credit balance
+   - No separate pools required - credits deducted from `user_credits` table
+   - The `api_key` is tracked in transactions for audit trail
+   - Legacy `api_key_credits` table retained for backward compatibility only
 
 3. **Refund Policy**: Smart refunds based on error type
    - System errors (500s, service failures): Full refund
